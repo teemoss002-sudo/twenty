@@ -490,15 +490,15 @@ const clearRecordingOnForMeeting = async ({
   meetingPolicyResult: CallRecorderPolicyResultForMeeting;
   remainingCallRecordings: CallRecordingRecord[];
 }): Promise<void> => {
-  const hasCallRecordingOutsideThisCancellation = remainingCallRecordings.some(
+  const hasRemainingRequestedCallRecording = remainingCallRecordings.some(
     (callRecording) =>
-      callRecording.recordingRequestStatus !==
-      CallRecordingRequestStatus.CANCELED,
+      callRecording.recordingRequestStatus ===
+      CallRecordingRequestStatus.REQUESTED,
   );
 
   if (
     meetingPolicyResult.calendarEventIdsWithRecordingOn.length === 0 ||
-    hasCallRecordingOutsideThisCancellation
+    hasRemainingRequestedCallRecording
   ) {
     return;
   }

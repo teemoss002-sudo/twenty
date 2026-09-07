@@ -1274,6 +1274,29 @@ describe('call recorder app lifecycle (integration)', () => {
       ).toBe('CANCELED');
     });
 
+    it('clears the On of a meeting the app only defers to a manual recording', async () => {
+      const calendarEventId = await createCalendarEvent();
+
+      await createPendingCallRecording({
+        calendarEventId,
+        recordingRequestStatus: null,
+      });
+
+      await client.mutation({
+        updateCalendarEvent: {
+          __args: { id: calendarEventId, data: { isCanceled: true } },
+          id: true,
+        },
+      });
+
+      await reconcileCallRecorderForCalendarEventIds({
+        client,
+        calendarEventIds: [calendarEventId],
+      });
+
+      expect(await fetchCallRecorderPreference(calendarEventId)).toBeNull();
+    });
+
     it('keeps the On of a meeting that was actually recorded', async () => {
       const calendarEventId = await createCalendarEvent({
         startsAt: hoursAgo(3),
