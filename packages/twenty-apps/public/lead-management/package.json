@@ -1,7 +1,7 @@
 {
   "name": "lead-management",
-  "version": "0.1.0",
-  "license": "MIT",
+  "version": "1.0.0",
+  "license": "UNLICENSED",
   "engines": {
     "node": "^24.5.0",
     "npm": "please-use-yarn",

@@ -164,6 +164,22 @@ The manifest **cannot rewrite the options of the core `stage` field** (`defineFi
 
 **Live workspace verification: BLOCKED/DEFERRED (environment limitation).** `yarn twenty dev:function:exec` and real database-event delivery require a Twenty server at `localhost:2020` with the worker running; the current sandbox has no server, no Docker, no Postgres/Redis — and `CoreApiClient` is only generated against a live workspace (`yarn twenty dev` rewrites `node_modules/twenty-client-sdk`), so the automation's HTTP layer cannot be exercised here. Run it once a server or remote workspace is available (it is also exercised automatically on install/upgrade + a status change). Until then: Gate A is covered end-to-end by `yarn smoke` against a mock metadata API (fails safe — the workspace keeps "Opportunity"), and the automation is covered by unit tests at the decision, payload and client-call level, with the real GraphQL round-trip verified against server source (`get-resolver-name.util.ts` for `createJob`/`updateOpportunity`, `permissions.utils.ts` for create-on-update, `transform-event-batch-to-event-payloads.ts` for `updatedFields`).
 
+## Selling / distribution
+
+**License:** proprietary (`UNLICENSED` + `LICENSE`) — do not publish the source under MIT terms.
+
+**Private sale (available today):** Twenty's marketplace has no paid checkout yet (credit billing is declared via the `billing:` block but not live), so charge the client outside Twenty (e.g. Stripe/invoice: setup fee + monthly per workspace) and deliver a private tarball:
+
+```bash
+yarn twenty remote:add --url https://client-twenty.example.com --as client
+yarn twenty dev:build --tarball        # local artifact only, no server needed
+yarn twenty app:publish --private --remote client   # deploy to their server
+```
+
+Then share it from **Settings → Applications → Registrations → Distribution → Copy share link** (private apps are not browsable in the marketplace). Each release must bump `version` in `package.json` — the server rejects same/lower versions with `VERSION_ALREADY_EXISTS`; installed workspaces with auto-upgrade enabled update in the background.
+
+**Marketplace (free funnel, later):** `yarn twenty app:publish` publishes `.twenty/output` to npm (name `lead-management`, keyword `twenty-app` already set) and the catalog syncs hourly (`yarn twenty dev:catalog-sync` forces it). Before listing: add `public/logo.png` + `galleryImages` (1600×1000) to `defineApplication`, and complete live-server verification below — installs are free until platform credit charging goes live, at which point a `billing.recurring` block in `src/app.ts` is what charges workspaces.
+
 ## Install / dev
 
 ```bash
