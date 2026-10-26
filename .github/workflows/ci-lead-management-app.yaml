@@ -61,6 +61,7 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: yarn test
 
+
       - name: Integration tests (live server)
         id: integration
         working-directory: ${{ env.APP_DIR }}
@@ -98,3 +99,60 @@ jobs:
           cp /tmp/diagnostics.md "run-${{ github.run_id }}.md"
           git add . && git commit -qm "Live CI diagnostics ${{ github.run_id }}"
           git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:ci-diagnostics
+
+  # Real marketplace screenshots, on demand only (Actions tab -> Run
+  # workflow): boots the same live instance, syncs the app, seeds demo
+  # data, photographs the real UI with Playwright, and commits the PNGs
+  # back over the mockups in public/.
+  screenshots:
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: packages/twenty-apps/public/lead-management
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Spawn Twenty test instance
+        id: twenty
+        uses: ./.github/actions/spawn-twenty-app-dev-test
+        with:
+          twenty-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Install app dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          corepack enable
+          yarn install --immutable
+
+      - name: Install Chromium for Playwright
+        working-directory: ${{ env.APP_DIR }}
+        run: yarn playwright install --with-deps chromium
+
+      - name: Capture screenshots (live server)
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          NODE_ENV: test
+          TWENTY_API_URL: ${{ steps.twenty.outputs.server-url }}
+          TWENTY_API_KEY: ${{ steps.twenty.outputs.api-key }}
+          FRONT_BASE_URL: ${{ steps.twenty.outputs.server-url }}
+        run: yarn screenshots
+
+      - name: Commit screenshots
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          git config user.email "ci@github-actions"
+          git config user.name "github-actions"
+          git add public/screenshot-pipeline.png public/screenshot-estimate-to-job.png public/screenshot-jobs.png
+          if git diff --cached --quiet; then
+            echo "Screenshots unchanged, nothing to commit."
+          else
+            git commit -m "Capture real UI screenshots from live CI [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
