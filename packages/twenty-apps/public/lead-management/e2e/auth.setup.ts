@@ -60,11 +60,19 @@ setup('authenticate', async ({ page }) => {
     await page.waitForFunction(() => !window.location.href.includes('verify'));
   }
 
+  // Login completion: the current frontend no longer stores a
+  // 'tokenPairState' localStorage key (session handling changed), so wait
+  // for the URL to leave the auth pages and the app shell to render.
   await page.waitForFunction(
-    () => window.localStorage.getItem('tokenPairState') !== null,
+    () =>
+      !/sign-in|welcome|verify|choose-workspace/.test(window.location.href),
     undefined,
-    { timeout: 15_000 },
+    { timeout: 30_000 },
   );
+
+  await expect(page.getByText('Companies').first()).toBeVisible({
+    timeout: 30_000,
+  });
 
   fs.mkdirSync(AUTH_DIR, { recursive: true });
   fs.writeFileSync(WORKSPACE_ORIGIN_FILE, new URL(page.url()).origin);

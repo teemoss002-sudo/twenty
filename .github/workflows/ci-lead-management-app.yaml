@@ -142,7 +142,28 @@ jobs:
           TWENTY_API_URL: ${{ steps.twenty.outputs.server-url }}
           TWENTY_API_KEY: ${{ steps.twenty.outputs.api-key }}
           FRONT_BASE_URL: ${{ steps.twenty.outputs.server-url }}
-        run: yarn screenshots
+        run: |
+          set -o pipefail
+          yarn screenshots 2>&1 | tee /tmp/screenshots.log
+
+      # Same diagnostics channel as the live-test job: logs + Playwright's
+      # failure screenshots pushed to a disposable branch, readable via API.
+      - name: Publish failure diagnostics
+        if: failure()
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/diag-repo/screenshots-${{ github.run_id }}
+          cp /tmp/screenshots.log /tmp/diag-repo/screenshots-${{ github.run_id }}/ 2>/dev/null || true
+          find e2e/.results -name '*.png' -exec cp {} /tmp/diag-repo/screenshots-${{ github.run_id }}/ \; 2>/dev/null || true
+          docker logs twenty-app-dev-test > /tmp/diag-repo/screenshots-${{ github.run_id }}/server.log 2>&1 || true
+          cd /tmp/diag-repo
+          git init -q
+          git config user.email "ci@github-actions"
+          git config user.name "github-actions"
+          git add . && git commit -qm "Screenshot diagnostics ${{ github.run_id }}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:ci-diagnostics
 
       - name: Commit screenshots
         working-directory: ${{ env.APP_DIR }}
