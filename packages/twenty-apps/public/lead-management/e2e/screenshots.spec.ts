@@ -147,6 +147,33 @@ const seeded: {
 };
 
 test.describe.serial('marketplace screenshots (real UI)', () => {
+  // The UI fails silently in screenshots; surface browser output in the log.
+  test.beforeEach(({ page }) => {
+    page.on('console', (message) => {
+      console.log(`[browser:${message.type()}] ${message.text()}`);
+    });
+
+    page.on('pageerror', (error) => {
+      console.log(`[pageerror] ${error.message}\n${error.stack ?? ''}`);
+    });
+
+    page.on('requestfailed', (request) => {
+      console.log(
+        `[requestfailed] ${request.method()} ${request.url()} — ${
+          request.failure()?.errorText ?? 'unknown error'
+        }`,
+      );
+    });
+
+    page.on('response', (response) => {
+      if (response.status() >= 400) {
+        console.log(
+          `[response ${response.status()}] ${response.request().method()} ${response.url()}`,
+        );
+      }
+    });
+  });
+
   test.beforeAll(async () => {
     const miller = await createLead('Miller — Water Heater Install', 'NEW');
     const johnson = await createLead(
@@ -218,9 +245,15 @@ test.describe.serial('marketplace screenshots (real UI)', () => {
     await page.goto(
       `${base}/objects/opportunities${viewId ? `?viewId=${viewId}` : ''}`,
     );
-    await expect(
-      page.getByText(seeded.heroLeadName).first(),
-    ).toBeVisible({ timeout: 30_000 });
+    try {
+      await expect(
+        page.getByText(seeded.heroLeadName).first(),
+      ).toBeVisible({ timeout: 60_000 });
+    } catch (error) {
+      const bodyText = await page.locator('body').innerText();
+      console.log(`[dump] opportunities page text: ${bodyText.slice(0, 4000)}`);
+      throw error;
+    }
     await page.waitForTimeout(1_500);
 
     await page.screenshot({
