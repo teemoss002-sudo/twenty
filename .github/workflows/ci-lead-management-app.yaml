@@ -71,18 +71,25 @@ jobs:
           set -o pipefail
           yarn test:integration 2>&1 | tee /tmp/integration.log
 
-      # Log blobs are not always reachable for external tooling; mirror the
-      # diagnostics into the job summary, which the API exposes.
+      # Raw job logs are not reachable from every environment; on failure,
+      # post the diagnostics as an issue so they stay readable anywhere.
       - name: Publish failure diagnostics
         if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           {
+            echo 'Live CI failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            echo
             echo '## Integration test log (tail)'
             echo '```'
-            tail -c 30000 /tmp/integration.log 2>/dev/null
+            tail -c 20000 /tmp/integration.log 2>/dev/null
             echo '```'
             echo '## Twenty server log (tail)'
             echo '```'
-            docker logs twenty-app-dev-test 2>&1 | tail -c 30000
+            docker logs twenty-app-dev-test 2>&1 | tail -c 20000
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } > /tmp/diagnostics.md
+          gh issue create \
+            --title "Live CI failure diagnostics (${{ github.run_id }})" \
+            --body-file /tmp/diagnostics.md
