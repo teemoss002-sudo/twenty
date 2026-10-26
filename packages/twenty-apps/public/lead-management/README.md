@@ -201,6 +201,8 @@ Post-install runs on fresh installs only (`previousVersion === undefined`). The 
 
 ## Known risks / safe failure modes
 
+- **Kanban views need explicit `groups`** — one per option of the group-by field, each with a stable UID. Without them the board renders zero columns (blank page, no error). Both boards declare them now (lead stages, job statuses); pinned by `manifest-invariants.test.ts`. Also found by the live screenshot run.
+
 - **`job`/`jobs` are reserved metadata names on current Twenty servers** (`RESERVED_METADATA_NAME_KEYWORDS` — there is a core jobs concept), and app sync rejects them as hard validation errors. The Job object is therefore `serviceJob`/`serviceJobs` in the API (GraphQL: `serviceJobs`, `createServiceJob`) and \"Job\" only in labels; likewise the reverse relation fields on Estimate/Person/WorkspaceMember are named `serviceJobs`. UIDs are unchanged, so the rename is sync-safe for any workspace that somehow has the old names (none shipped). The live CI run caught this — the local manifest build does not check server reserved names. Pinned by `manifest-invariants.test.ts`.
 
 - **SDK constants are stubbed inside built function bundles** (`stub-twenty-sdk-define.plugin.ts`): any non-`define*` import from `twenty-sdk/define` — including `STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS` — renders as an empty string at runtime. Runtime code (handlers) must use literal UIDs; `lead-labels.test.ts` pins the literal to the real SDK value to catch upstream drift. Manifest code (objects/fields/views) is unaffected.

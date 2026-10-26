@@ -7,6 +7,11 @@ import {
   JOB_BOARD_VIEW_FIELD_NAME_UNIVERSAL_IDENTIFIER,
   JOB_BOARD_VIEW_FIELD_SCHEDULED_START_UNIVERSAL_IDENTIFIER,
   JOB_BOARD_VIEW_FIELD_STATUS_UNIVERSAL_IDENTIFIER,
+  JOB_BOARD_GROUP_CANCELLED_UNIVERSAL_IDENTIFIER,
+  JOB_BOARD_GROUP_COMPLETED_UNIVERSAL_IDENTIFIER,
+  JOB_BOARD_GROUP_EN_ROUTE_UNIVERSAL_IDENTIFIER,
+  JOB_BOARD_GROUP_IN_PROGRESS_UNIVERSAL_IDENTIFIER,
+  JOB_BOARD_GROUP_SCHEDULED_UNIVERSAL_IDENTIFIER,
   JOB_BOARD_VIEW_UNIVERSAL_IDENTIFIER,
   JOB_CUSTOMER_FIELD_UNIVERSAL_IDENTIFIER,
   JOB_NAME_FIELD_UNIVERSAL_IDENTIFIER,
@@ -67,6 +72,40 @@ export default defineView({
       position: 4,
       isVisible: true,
       size: 200,
+    },
+  ],
+  // One group per Job status option — without these the board renders no
+  // columns at all (groups are not derived from the field's options).
+  groups: [
+    {
+      universalIdentifier: JOB_BOARD_GROUP_SCHEDULED_UNIVERSAL_IDENTIFIER,
+      fieldValue: 'SCHEDULED',
+      position: 0,
+      isVisible: true,
+    },
+    {
+      universalIdentifier: JOB_BOARD_GROUP_EN_ROUTE_UNIVERSAL_IDENTIFIER,
+      fieldValue: 'EN_ROUTE',
+      position: 1,
+      isVisible: true,
+    },
+    {
+      universalIdentifier: JOB_BOARD_GROUP_IN_PROGRESS_UNIVERSAL_IDENTIFIER,
+      fieldValue: 'IN_PROGRESS',
+      position: 2,
+      isVisible: true,
+    },
+    {
+      universalIdentifier: JOB_BOARD_GROUP_COMPLETED_UNIVERSAL_IDENTIFIER,
+      fieldValue: 'COMPLETED',
+      position: 3,
+      isVisible: true,
+    },
+    {
+      universalIdentifier: JOB_BOARD_GROUP_CANCELLED_UNIVERSAL_IDENTIFIER,
+      fieldValue: 'CANCELLED',
+      position: 4,
+      isVisible: true,
     },
   ],
 });

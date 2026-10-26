@@ -308,6 +308,40 @@ describe('view wiring', () => {
   });
 });
 
+describe('kanban view groups', () => {
+  // A kanban view renders zero columns unless every option of its
+  // group-by field is declared as a group (found live: blank boards).
+  it('the Lead Pipeline declares one group per leadStage option', async () => {
+    const leadStageField = await import('src/fields/opportunity/lead-stage.field');
+    const options = (
+      leadStageField.default.config as { options?: Array<{ value: string }> }
+    ).options ?? [];
+    const groups = leadPipelineView.config.groups ?? [];
+
+    expect(groups.map((group) => group.fieldValue)).toEqual(
+      options.map((option) => option.value),
+    );
+    expect(
+      new Set(groups.map((group) => group.universalIdentifier)).size,
+    ).toBe(groups.length);
+  });
+
+  it('the Job Board declares one group per Job status option', () => {
+    const statusField = jobObject.config.fields.find(
+      (field) => field.name === 'status',
+    ) as { options?: Array<{ value: string }> } | undefined;
+    const groups = jobBoardView.config.groups ?? [];
+
+    expect(statusField).toBeDefined();
+    expect(groups.map((group) => group.fieldValue)).toEqual(
+      (statusField?.options ?? []).map((option) => option.value),
+    );
+    expect(
+      new Set(groups.map((group) => group.universalIdentifier)).size,
+    ).toBe(groups.length);
+  });
+});
+
 describe('navigation and page layout wiring', () => {
   it('the Leads nav item opens the Lead Pipeline view', () => {
     expect(leadsNavItem.config.viewUniversalIdentifier).toBe(
