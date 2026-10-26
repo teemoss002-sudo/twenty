@@ -1,0 +1,147 @@
+[dev] Checking server...
+[dev] Building manifest...
+[dev] Building application files...
+[dev] Running typecheck...
+[dev] Computing metadata plan...
+[dev] Registering application...
+[dev] Uploading 10 files...
+[dev] Syncing manifest...
+[dev] Generating API client...
+
+Running 4 tests using 1 worker
+·[browser:warning] No `HydrateFallback` element provided to render during initial hydration
+[dump] opportunities page text: A
+Apple
+Home
+Inbox
+Settings
+Workspace
+Companies
+People
+Opportunities
+Tasks
+Notes
+Lead Pipeline · Opportunities
+Dashboards
+Estimates
+Workflows
+Jobs
+Star History
+Opportunities
+Create
+Lead Pipeline
+· 156
+Filter
+Sort
+Options
+×°°[browser:warning] No `HydrateFallback` element provided to render during initial hydration
+[dump] opportunities page text: A
+Apple
+Home
+Inbox
+Settings
+Workspace
+Companies
+People
+Opportunities
+Tasks
+Notes
+Lead Pipeline · Opportunities
+Dashboards
+Estimates
+Workflows
+Jobs
+Star History
+Opportunities
+Create
+Sync lost with mailbox tim@apple.dev. Please reconnect for updates:
+Reconnect
+Lead Pipeline
+· 162
+Filter
+Sort
+Options
+F
+::error file=packages/twenty-apps/public/lead-management/e2e/screenshots.spec.ts,title=[chromium] › e2e/screenshots.spec.ts:255:7 › marketplace screenshots (real UI) › lead pipeline,line=265,col=9::  1) [chromium] › e2e/screenshots.spec.ts:255:7 › marketplace screenshots (real UI) › lead pipeline %0A    Error: expect(locator).toBeVisible() failed%0A%0A    Locator: getByText('Johnson Residence — AC Replacement').first()%0A    Expected: visible%0A    Timeout: 60000ms%0A    Error: element(s) not found%0A%0A    Call log:%0A      - Expect "toBeVisible" getByText('Johnson Residence — AC Replacement').first() with timeout 60000ms%0A      - waiting for getByText('Johnson Residence — AC Replacement').first()%0A%0A%0A      263 |       await expect(%0A      264 |         page.getByText(seeded.heroLeadName).first(),%0A    > 265 |       ).toBeVisible({ timeout: 60_000 });%0A          |         ^%0A      266 |     } catch (error) {%0A      267 |       const bodyText = await page.locator('body').innerText();%0A      268 |       console.log(`[dump] opportunities page text: ${bodyText.slice(0, 4000)}`);%0A        at /home/runner/work/twenty/twenty/packages/twenty-apps/public/lead-management/e2e/screenshots.spec.ts:265:9
+::error file=packages/twenty-apps/public/lead-management/e2e/screenshots.spec.ts,title=[chromium] › e2e/screenshots.spec.ts:255:7 › marketplace screenshots (real UI) › lead pipeline,line=265,col=9::  1) [chromium] › e2e/screenshots.spec.ts:255:7 › marketplace screenshots (real UI) › lead pipeline %0A%0A    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────%0A    Error: expect(locator).toBeVisible() failed%0A%0A    Locator: getByText('Johnson Residence — AC Replacement').first()%0A    Expected: visible%0A    Timeout: 60000ms%0A    Error: element(s) not found%0A%0A    Call log:%0A      - Expect "toBeVisible" getByText('Johnson Residence — AC Replacement').first() with timeout 60000ms%0A      - waiting for getByText('Johnson Residence — AC Replacement').first()%0A%0A%0A      263 |       await expect(%0A      264 |         page.getByText(seeded.heroLeadName).first(),%0A    > 265 |       ).toBeVisible({ timeout: 60_000 });%0A          |         ^%0A      266 |     } catch (error) {%0A      267 |       const bodyText = await page.locator('body').innerText();%0A      268 |       console.log(`[dump] opportunities page text: ${bodyText.slice(0, 4000)}`);%0A        at /home/runner/work/twenty/twenty/packages/twenty-apps/public/lead-management/e2e/screenshots.spec.ts:265:9
+°°
+
+  1) [chromium] › e2e/screenshots.spec.ts:255:7 › marketplace screenshots (real UI) › lead pipeline 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Johnson Residence — AC Replacement').first()
+    Expected: visible
+    Timeout: 60000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByText('Johnson Residence — AC Replacement').first() with timeout 60000ms
+      - waiting for getByText('Johnson Residence — AC Replacement').first()
+
+
+      263 |       await expect(
+      264 |         page.getByText(seeded.heroLeadName).first(),
+    > 265 |       ).toBeVisible({ timeout: 60_000 });
+          |         ^
+      266 |     } catch (error) {
+      267 |       const bodyText = await page.locator('body').innerText();
+      268 |       console.log(`[dump] opportunities page text: ${bodyText.slice(0, 4000)}`);
+        at /home/runner/work/twenty/twenty/packages/twenty-apps/public/lead-management/e2e/screenshots.spec.ts:265:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium/trace.zip
+    Usage:
+
+        yarn playwright show-trace e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Johnson Residence — AC Replacement').first()
+    Expected: visible
+    Timeout: 60000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByText('Johnson Residence — AC Replacement').first() with timeout 60000ms
+      - waiting for getByText('Johnson Residence — AC Replacement').first()
+
+
+      263 |       await expect(
+      264 |         page.getByText(seeded.heroLeadName).first(),
+    > 265 |       ).toBeVisible({ timeout: 60_000 });
+          |         ^
+      266 |     } catch (error) {
+      267 |       const bodyText = await page.locator('body').innerText();
+      268 |       console.log(`[dump] opportunities page text: ${bodyText.slice(0, 4000)}`);
+        at /home/runner/work/twenty/twenty/packages/twenty-apps/public/lead-management/e2e/screenshots.spec.ts:265:9
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium-retry1/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium-retry1/trace.zip
+    Usage:
+
+        yarn playwright show-trace e2e/.results/screenshots-marketplace-screenshots-real-UI-lead-pipeline-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › e2e/screenshots.spec.ts:255:7 › marketplace screenshots (real UI) › lead pipeline ─
+  2 did not run
+  1 passed (2.7m)
+::notice title=🎭 Playwright Run Summary::  1 failed%0A    [chromium] › e2e/screenshots.spec.ts:255:7 › marketplace screenshots (real UI) › lead pipeline ─%0A  2 did not run%0A  1 passed (2.7m)
