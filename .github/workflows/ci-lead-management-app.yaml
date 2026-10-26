@@ -1,0 +1,69 @@
+name: CI Lead Management App (live)
+
+# Live end-to-end verification for the JobFlow lead-management app:
+# spawns a real Twenty server (all-in-one twenty-app-dev image: server,
+# worker, Postgres, Redis), syncs the app into it, and runs the
+# integration suite — including the accepted-estimate -> Job automation
+# against real database-event delivery. No secrets required: the test
+# instance is ephemeral and uses the seeded dev admin token.
+
+on:
+  push:
+    branches:
+      - main
+      - 'arena/**'
+    paths:
+      - 'packages/twenty-apps/public/lead-management/**'
+      - '.github/workflows/ci-lead-management-app.yaml'
+      - '.github/actions/spawn-twenty-app-dev-test/**'
+  pull_request:
+    paths:
+      - 'packages/twenty-apps/public/lead-management/**'
+      - '.github/workflows/ci-lead-management-app.yaml'
+      - '.github/actions/spawn-twenty-app-dev-test/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-test:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: packages/twenty-apps/public/lead-management
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Spawn Twenty test instance
+        id: twenty
+        uses: ./.github/actions/spawn-twenty-app-dev-test
+        with:
+          twenty-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Install app dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          corepack enable
+          yarn install --immutable
+
+      - name: Unit tests
+        working-directory: ${{ env.APP_DIR }}
+        run: yarn test
+
+      - name: Integration tests (live server)
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          TWENTY_API_URL: ${{ steps.twenty.outputs.server-url }}
+          TWENTY_API_KEY: ${{ steps.twenty.outputs.api-key }}
+        run: yarn test:integration
