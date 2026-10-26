@@ -62,8 +62,27 @@ jobs:
         run: yarn test
 
       - name: Integration tests (live server)
+        id: integration
         working-directory: ${{ env.APP_DIR }}
         env:
           TWENTY_API_URL: ${{ steps.twenty.outputs.server-url }}
           TWENTY_API_KEY: ${{ steps.twenty.outputs.api-key }}
-        run: yarn test:integration
+        run: |
+          set -o pipefail
+          yarn test:integration 2>&1 | tee /tmp/integration.log
+
+      # Log blobs are not always reachable for external tooling; mirror the
+      # diagnostics into the job summary, which the API exposes.
+      - name: Publish failure diagnostics
+        if: failure()
+        run: |
+          {
+            echo '## Integration test log (tail)'
+            echo '```'
+            tail -c 30000 /tmp/integration.log 2>/dev/null
+            echo '```'
+            echo '## Twenty server log (tail)'
+            echo '```'
+            docker logs twenty-app-dev-test 2>&1 | tail -c 30000
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
