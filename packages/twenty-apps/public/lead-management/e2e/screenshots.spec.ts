@@ -171,6 +171,20 @@ test.describe.serial('marketplace screenshots (real UI)', () => {
           `[response ${response.status()}] ${response.request().method()} ${response.url()}`,
         );
       }
+
+      // GraphQL errors come back as HTTP 200 with an errors array.
+      if (response.url().includes('/graphql') && response.status() === 200) {
+        response
+          .json()
+          .then((body: { errors?: Array<{ message: string }> }) => {
+            if (body.errors?.length) {
+              console.log(
+                `[graphql errors] ${JSON.stringify(body.errors).slice(0, 2000)}`,
+              );
+            }
+          })
+          .catch(() => {});
+      }
     });
   });
 
