@@ -11,10 +11,19 @@
 //   5. upgrade path: previousVersion set → skipped, no API calls
 //   6. failure path: API errors are logged and swallowed (fallback, no throw)
 //
+// It also pins the BUILT MANIFEST wiring for the accepted-estimate automation,
+// which unit tests cannot see: the database-event trigger (eventName +
+// updatedFields) and the emitted function bundle. The function's own behavior is
+// covered by src/logic-functions/estimate-accepted.test.ts; exercising it here
+// would need a generated CoreApiClient, which only a live Twenty server produces
+// (`yarn twenty dev` regenerates node_modules/twenty-client-sdk).
+//
 // Run: yarn build (or dev:build) then yarn smoke
 
 import http from 'node:http';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 
 const OPPORTUNITY_OBJECT_UNIVERSAL_IDENTIFIER =
   '20202020-9549-49dd-b2b2-883999db8938'; // SDK STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.opportunity
@@ -152,6 +161,34 @@ try {
     'API rejection: handled gracefully (fallback, no throw)',
     true,
     'handler logged and swallowed the error',
+  );
+
+  // --- Scenario 4: built manifest carries the estimate → job trigger
+  const manifest = JSON.parse(
+    await readFile(
+      new URL('../.twenty/output/manifest.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const automation = (manifest.logicFunctions ?? []).find(
+    (logicFunction) => logicFunction.name === 'estimate-accepted-to-job',
+  );
+  const trigger = automation?.databaseEventTriggerSettings;
+
+  record(
+    'built manifest: automation listens to estimate.updated filtered to status',
+    trigger?.eventName === 'estimate.updated' &&
+      JSON.stringify(trigger?.updatedFields) === JSON.stringify(['status']),
+    trigger ? JSON.stringify(trigger) : 'trigger missing',
+  );
+
+  record(
+    'built manifest: automation bundle is emitted',
+    Boolean(automation?.builtHandlerPath) &&
+      existsSync(
+        new URL(`../.twenty/output/${automation.builtHandlerPath}`, import.meta.url),
+      ),
+    automation?.builtHandlerPath ?? 'builtHandlerPath missing',
   );
 
   console.log('\nSummary:', results.filter((r) => r.ok).length, '/', results.length, 'checks passed');

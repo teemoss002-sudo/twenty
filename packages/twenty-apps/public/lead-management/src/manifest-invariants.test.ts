@@ -12,11 +12,16 @@ import { describe, expect, it } from 'vitest';
 //   4. every view field references a field that exists on the view's object
 //   5. navigation items point at views/objects that exist in this app
 //   6. the record-page tab targets the standard Opportunity record page layout
+//   7. the accepted-estimate automation listens to the estimate status field and
+//      holds exactly the record permissions its two writes need
 
 import application from 'src/app';
 import estimateObject from 'src/objects/estimate.object';
 import jobObject from 'src/objects/job.object';
 import { OPPORTUNITY_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/opportunity.object';
+
+import estimateAccepted from 'src/logic-functions/estimate-accepted';
+import defaultRole from 'src/roles/default-role';
 
 import estimateJobsField from 'src/fields/estimate/jobs.field';
 import estimateLeadField from 'src/fields/estimate/lead.field';
@@ -122,6 +127,7 @@ describe('universal identifier uniqueness', () => {
       estimatesNavItem.config,
       jobsNavItem.config,
       leadPageLayoutTab.config,
+      estimateAccepted.config,
     ];
 
     const universalIdentifiers = allEntities.map(
@@ -322,5 +328,71 @@ describe('navigation and page layout wiring', () => {
     expect(leadPageLayoutTab.config.pageLayoutUniversalIdentifier).toBe(
       LEAD_RECORD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER,
     );
+  });
+});
+
+describe('accepted-estimate automation wiring', () => {
+  it('listens to the Estimate update event filtered to the status field', () => {
+    expect(estimateAccepted.config.databaseEventTriggerSettings).toEqual({
+      eventName: `${estimateObject.config.nameSingular}.updated`,
+      updatedFields: ['status'],
+    });
+  });
+
+  it('the triggered field exists on the Estimate object', () => {
+    expect(
+      (estimateObject.config.fields ?? []).some(
+        (field) => field.name === 'status',
+      ),
+    ).toBe(true);
+  });
+
+  it('the function role can read + update Job and Opportunity (create is gated on update)', () => {
+    const permissions = defaultRole.config.objectPermissions ?? [];
+
+    const jobPermission = permissions.find(
+      (permission) =>
+        permission.objectUniversalIdentifier ===
+        jobObject.config.universalIdentifier,
+    );
+    const opportunityPermission = permissions.find(
+      (permission) =>
+        permission.objectUniversalIdentifier ===
+        OPPORTUNITY_OBJECT_UNIVERSAL_IDENTIFIER,
+    );
+
+    // twenty-server gates record insertion on canUpdateObjectRecords
+    // (engine/twenty-orm/repository/permissions.utils), so a missing override
+    // here silently disables the whole automation.
+    expect(jobPermission).toMatchObject({
+      canReadObjectRecords: true,
+      canUpdateObjectRecords: true,
+      canSoftDeleteObjectRecords: false,
+      canDestroyObjectRecords: false,
+    });
+    expect(opportunityPermission).toMatchObject({
+      canReadObjectRecords: true,
+      canUpdateObjectRecords: true,
+      canSoftDeleteObjectRecords: false,
+      canDestroyObjectRecords: false,
+    });
+  });
+
+  it('the function role stays read-only everywhere else', () => {
+    expect(defaultRole.config.canReadAllObjectRecords).toBe(true);
+    expect(defaultRole.config.canUpdateAllObjectRecords).toBe(false);
+    expect(defaultRole.config.canSoftDeleteAllObjectRecords).toBe(false);
+    expect(defaultRole.config.canDestroyAllObjectRecords).toBe(false);
+    // Gate A (post-install relabel) still needs settings access.
+    expect(defaultRole.config.canUpdateAllSettings).toBe(true);
+  });
+
+  it('the lead stage the automation writes still offers WON', async () => {
+    const leadStageField = await import('src/fields/opportunity/lead-stage.field');
+    const options =
+      (leadStageField.default.config as { options?: Array<{ value: string }> })
+        .options ?? [];
+
+    expect(options.map((option) => option.value)).toContain('WON');
   });
 });

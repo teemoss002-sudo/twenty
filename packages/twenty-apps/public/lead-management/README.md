@@ -23,6 +23,10 @@ custom object             → customer: MANY_TO_ONE → Person
 Job (custom object)       → estimate: MANY_TO_ONE → Estimate
                           → customer: MANY_TO_ONE → Person
                           → assignedTech: MANY_TO_ONE → WorkspaceMember
+
+Estimate.status → ACCEPTED  ── database-event trigger ──▶  Job created (linked
+                                                            to estimate + customer)
+                                                         + Lead moved to Won
 ```
 
 - **No `defineObject()` call exists.** The object keeps `nameSingular: 'opportunity'`; "Lead" is presentation only.
@@ -44,6 +48,10 @@ Job (custom object)       → estimate: MANY_TO_ONE → Estimate
 | `src/roles/default-role.ts` | `defineApplicationRole` — function runtime role |
 | `src/roles/sales-rep.role.ts` | Assignable role; "owner is current member" predicate |
 | `src/logic-functions/post-install.ts` | Gate A hook |
+| `src/logic-functions/estimate-accepted.ts` | **Automation**: database-event logic function — accepted Estimate → Job + Lead Won |
+| `src/logic-functions/estimate-accepted-to-job.ts` | Pure trigger decision + Job/Lead payload builders (literal select values only) |
+| `src/logic-functions/estimate-accepted.test.ts` | Unit tests: trigger wiring, handler flow, idempotency, failure policy (mocked client) |
+| `src/logic-functions/estimate-accepted-to-job.test.ts` | Unit tests: transition guards, exact Job payload, Won guard |
 | `src/logic-functions/lead-labels.test.ts` | Unit tests: Gate A payload & invariants |
 | `src/manifest-invariants.test.ts` | Unit tests: UID uniqueness, standard-object safety, relation pairing, view/nav/tab wiring |
 | `src/objects/estimate.object.ts` | **Estimate** custom object: status (Draft/Sent/Accepted/Declined), totalAmount, lineItems (RAW_JSON), validUntil, sentAt |
@@ -78,6 +86,63 @@ Built exactly on the real-estate/partners app conventions:
 - Record pages: Home tab (FIELDS widget over a FIELDS_WIDGET view) + Timeline tab — tasks, notes, attachments surface through the timeline automatically.
 - Navigation: Leads (4) → Estimates (5) → Jobs (6).
 
+## Automation — accepted Estimate creates the Job
+
+`src/logic-functions/estimate-accepted.ts` closes the Estimate → Job handoff. It is a manifest-declared logic function, not a workflow built by hand in the UI:
+
+```ts
+databaseEventTriggerSettings: {
+  eventName: 'estimate.updated',
+  updatedFields: ['status'],
+}
+```
+
+**When it runs.** Only when `estimate.status` transitions **to** `ACCEPTED`:
+
+1. the server-side filter (`updatedFields: ['status']`) drops updates that do not touch status;
+2. the handler re-checks the event in `estimate-accepted-to-job.ts` — it must be `estimate.updated`, `after.status === 'ACCEPTED'`, and the previous status (from `before`, or the event diff on slim payloads) must **not** already be `ACCEPTED`;
+3. the estimate is re-read from the workspace (the event is a hint, not the source of truth). If it no longer exists or is no longer accepted, nothing is written.
+
+**What it writes.**
+
+| Write | Value |
+| --- | --- |
+| `createJob` | `name` = estimate name (fallback `Job from accepted estimate`), `status` = `SCHEDULED`, `estimateId` = the accepted estimate, `customerId` = the estimate's customer when set |
+| `updateOpportunity` | `leadStage` = `WON`, **only** when the lead exists and is not already Won |
+
+Nothing else is copied: `scheduledStart`/`scheduledEnd`, `serviceType`, `assignedTech` and `techNotes` stay manual, so the automation never invents a dispatch decision.
+
+**Retry safety.** Database-event triggers are queued with retries, and the same accepted estimate can emit more than one event (a later edit that touches status, a manual replay). Both writes are read-before-write:
+
+- a Job already linked to the estimate (any status) is reused — the automation never creates a second Job for one estimate;
+- an already-Won lead is not rewritten.
+
+A Job cancelled by dispatch is **not** resurrected when the estimate is re-accepted; that is a deliberate manual decision.
+
+**Failure policy.** Unlike Gate A, this handler logs the estimate id and rethrows. A failed create should be visible in `yarn twenty dev:function:logs` and retried by the queue; rethrowing after partial success is safe because the next run finds the Job and only finishes the remaining write. Reverting an accepted estimate to Draft/Declined after the fact does **not** auto-cancel the Job — cancel it in the Jobs board if the work is not happening.
+
+**Deliberately out of scope.**
+
+- **An estimate created directly with status Accepted does not fire this trigger.** The trigger is on `estimate.updated` (the normal Draft → Sent → Accepted path); subscribing to `estimate.created` as well would burn a function run for every Draft estimate created. For imported data, create such Jobs manually or move the status through Draft → Accepted.
+- No scheduling, technician assignment, invoice, or email is produced; the Job starts as `Scheduled` and unassigned.
+- No cancellation/reschedule mirror when an accepted estimate is later reverted.
+
+**Permissions.** The function runs under the app's default role. Twenty gates record **insertion** on `canUpdateObjectRecords` (`twenty-server` → `engine/twenty-orm/repository/permissions.utils.ts`), so `src/roles/default-role.ts` carries explicit read+update overrides for **Job** and **Opportunity** only; everything else stays read-only, and `canUpdateAllSettings` remains for Gate A. `manifest-invariants.test.ts` pins both the overrides and the trigger's `updatedFields`, because a missing permission or a renamed field turns the automation into a silent no-op.
+
+**Running it manually.** After `yarn twenty dev` against a live server, either flip an estimate to Accepted in the UI (the worker picks up the event) or invoke the function directly:
+
+```bash
+yarn twenty dev:function:exec -n estimate-accepted-to-job -p '{
+  "name": "estimate.updated",
+  "recordId": "<estimate-id>",
+  "properties": {
+    "before": { "id": "<estimate-id>", "status": "SENT" },
+    "after":  { "id": "<estimate-id>", "status": "ACCEPTED" },
+    "updatedFields": ["status"]
+  }
+}'
+```
+
 ## Stages — why an app-owned `leadStage` field
 
 The manifest **cannot rewrite the options of the core `stage` field** (`defineField` only adds fields), and mutating core select options at runtime was rejected in the plan (replacing options can orphan existing record values). So the JobFlow pipeline lives in `leadStage`; the core `stage` field is untouched and simply not surfaced in JobFlow views/layouts.
@@ -95,9 +160,9 @@ The manifest **cannot rewrite the options of the core `stage` field** (`defineFi
 
 ## Verification status
 
-**Local (sandbox, 2026-09-12):** `yarn typecheck`, `yarn test` (20/20 — Gate A payload invariants + manifest-layer invariants), `yarn twenty dev:build`, and `yarn smoke` (4/4 on the built post-install bundle) all pass. Manifest build enforces the single-`defineApplicationRole` invariant, so the default function role is pinned at build time.
+**Local (sandbox, 2026-10-26):** `yarn typecheck`, `yarn test` (**61/61** across 4 files — Gate A payload invariants, estimate→job trigger guards/payloads, handler flow with a mocked `CoreApiClient`, manifest-layer invariants), `yarn twenty dev:build` (6 emitted files), and `yarn smoke` (**6/6** — the built post-install bundle plus the built manifest's automation trigger and bundle path) all pass. Manifest build enforces the single-`defineApplicationRole` invariant, so the default function role is pinned at build time.
 
-**Live workspace verification: BLOCKED/DEFERRED (environment limitation).** `yarn twenty dev:function:exec --postInstall` requires a Twenty server at `localhost:2020`; the current sandbox has no server, no Docker, no Postgres/Redis. Run it once a server or remote workspace is available (it is also exercised automatically on first `app:publish` + install). Until then, Gate A behavior is covered end-to-end by `yarn smoke` against a mock metadata API; the real-run risk (workspace rejecting the relabel) fails safe by design — the workspace keeps "Opportunity".
+**Live workspace verification: BLOCKED/DEFERRED (environment limitation).** `yarn twenty dev:function:exec` and real database-event delivery require a Twenty server at `localhost:2020` with the worker running; the current sandbox has no server, no Docker, no Postgres/Redis — and `CoreApiClient` is only generated against a live workspace (`yarn twenty dev` rewrites `node_modules/twenty-client-sdk`), so the automation's HTTP layer cannot be exercised here. Run it once a server or remote workspace is available (it is also exercised automatically on install/upgrade + a status change). Until then: Gate A is covered end-to-end by `yarn smoke` against a mock metadata API (fails safe — the workspace keeps "Opportunity"), and the automation is covered by unit tests at the decision, payload and client-call level, with the real GraphQL round-trip verified against server source (`get-resolver-name.util.ts` for `createJob`/`updateOpportunity`, `permissions.utils.ts` for create-on-update, `transform-event-batch-to-event-payloads.ts` for `updatedFields`).
 
 ## Install / dev
 
@@ -107,14 +172,16 @@ yarn install
 yarn typecheck               # tsc --noEmit
 yarn test                    # unit tests (vitest)
 yarn twenty dev:build        # build the manifest + function bundles locally
-yarn smoke                   # runtime smoke test of the BUILT post-install hook
+yarn smoke                   # built post-install bundle + automation manifest wiring
 
-yarn twenty dev                 # sync manifest to a local workspace (hooks don't run in dev)
+yarn twenty dev                 # sync manifest to a local workspace (install hooks don't run in dev)
 yarn twenty dev:function:exec --postInstall   # run Gate A manually during development
+yarn twenty dev:function:exec -n estimate-accepted-to-job -p '{"name":"estimate.updated","recordId":"<id>","properties":{"before":{"id":"<id>","status":"SENT"},"after":{"id":"<id>","status":"ACCEPTED"},"updatedFields":["status"]}}'
+yarn twenty dev:function:logs   # watch automation output (success line + rethrown failures)
 yarn twenty app:publish        # publish; installs run Gate A automatically
 ```
 
-Post-install runs on fresh installs only (`previousVersion === undefined`).
+Post-install runs on fresh installs only (`previousVersion === undefined`). The automation is a database-event trigger: it fires from the server worker whenever an estimate's status changes, including in dev once the app is synced.
 
 ## Known risks / safe failure modes
 
@@ -122,3 +189,7 @@ Post-install runs on fresh installs only (`previousVersion === undefined`).
 - Gate A is source-verified against this repo's server code; the residual risks are server-version drift (the editable-properties list or filter API changing upstream) and the app token being denied the metadata mutation. Both fail safe: the hook logs and the workspace keeps "Opportunity".
 - Standard-field references (`opportunity.fields.name`, `.owner`, `.pointOfContact`) are doc-verified and used in **manifest** code only; any drift fails at manifest build, not runtime.
 - View filters are literal values, so "My Leads" is scoped by the Sales Rep role predicate rather than a current-user filter (admins see all).
+- The automation writes select values as literals (`ACCEPTED`, `WON`, `SCHEDULED`) and reads `estimate.updated` / `status`. Those strings mirror the manifest definitions and are pinned by `estimate-accepted-to-job.test.ts` + `manifest-invariants.test.ts`; renaming an option or field in the manifest requires updating the literal in the same change, or the trigger becomes a silent no-op.
+- The automation's object permissions ship in the same manifest as the role. On a workspace that already has the app installed, the app must be upgraded/re-synced before the new Job/Opportunity overrides exist; until then `createJob` fails with `PERMISSION_DENIED` (logged, retried, and safe to replay because creation is read-guarded).
+- Duplicate protection keys off the Job → estimate link. If the auto-created Job is deleted and the estimate emits another accepted event, a new Job is created; if a user manually creates a Job for that estimate first, the automation reuses it (any status) rather than adding a second one.
+- Database-event delivery needs the server worker; `yarn twenty dev` alone only syncs metadata. The smoke test cannot cover the HTTP round-trip because `CoreApiClient` is generated only against a live workspace.
