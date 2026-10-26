@@ -14,6 +14,18 @@ export default defineApplication({
   // Must be one of the SDK-known categories (Communication, Productivity,
   // Product management, Sales, Marketing, Enrichment, Data, Search, Other).
   category: 'Sales',
+  // Marketplace assets, bundled in public/ (external URLs are ignored).
+  // Gallery images are illustrative mockups until real captures can be taken
+  // from a live workspace; replace them with actual screenshots before a
+  // public listing.
+  logo: 'public/logo.png',
+  galleryImages: [
+    'public/screenshot-pipeline.png',
+    'public/screenshot-estimate-to-job.png',
+    'public/screenshot-jobs.png',
+  ],
+  // No aboutDescription: SDK 2.39 omits it from the settable config, so the
+  // marketplace falls back to this package's README.md from npm.
   // No `defaultRoleUniversalIdentifier` here: SDK 2.39 deprecates the property
   // and auto-derives the default role from the single defineApplicationRole()
   // file (src/roles/default-role.ts). The manifest build errors if zero or

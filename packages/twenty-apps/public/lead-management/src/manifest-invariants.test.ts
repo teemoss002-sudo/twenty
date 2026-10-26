@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 // Regression net for the manifest layer (the README "File map" declarations).
@@ -394,5 +397,36 @@ describe('accepted-estimate automation wiring', () => {
         .options ?? [];
 
     expect(options.map((option) => option.value)).toContain('WON');
+  });
+});
+
+describe('marketplace assets', () => {
+  const MAX_ASSET_BYTES = 10 * 1024 * 1024; // marketplace rehost limit
+
+  it('declares a bundled logo and three gallery images', () => {
+    expect(application.config.logo).toBe('public/logo.png');
+    expect(application.config.galleryImages).toEqual([
+      'public/screenshot-pipeline.png',
+      'public/screenshot-estimate-to-job.png',
+      'public/screenshot-jobs.png',
+    ]);
+  });
+
+  it('every referenced asset exists, is a PNG, and is under the 10 MB limit', () => {
+    const assets = [
+      application.config.logo as string,
+      ...(application.config.galleryImages as string[]),
+    ];
+
+    for (const asset of assets) {
+      const assetPath = join(process.cwd(), asset);
+      expect(existsSync(assetPath), asset).toBe(true);
+      expect(statSync(assetPath).size, asset).toBeLessThan(MAX_ASSET_BYTES);
+      // PNG magic bytes.
+      expect(
+        readFileSync(assetPath).subarray(0, 4).toString('hex'),
+        asset,
+      ).toBe('89504e47');
+    }
   });
 });

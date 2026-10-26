@@ -178,7 +178,7 @@ yarn twenty app:publish --private --remote client   # deploy to their server
 
 Then share it from **Settings → Applications → Registrations → Distribution → Copy share link** (private apps are not browsable in the marketplace). Each release must bump `version` in `package.json` — the server rejects same/lower versions with `VERSION_ALREADY_EXISTS`; installed workspaces with auto-upgrade enabled update in the background.
 
-**Marketplace (free funnel, later):** `yarn twenty app:publish` publishes `.twenty/output` to npm (name `lead-management`, keyword `twenty-app` already set) and the catalog syncs hourly (`yarn twenty dev:catalog-sync` forces it). Before listing: add `public/logo.png` + `galleryImages` (1600×1000) to `defineApplication`, and complete live-server verification below — installs are free until platform credit charging goes live, at which point a `billing.recurring` block in `src/app.ts` is what charges workspaces.
+**Marketplace (free funnel, later):** `yarn twenty app:publish` publishes `.twenty/output` to npm (name `lead-management`, keyword `twenty-app` already set) and the catalog syncs hourly (`yarn twenty dev:catalog-sync` forces it). Listing assets are wired: `public/logo.png` + three `galleryImages` in `defineApplication` (pinned by `manifest-invariants.test.ts`, present in the built manifest and tarball). The gallery images are **illustrative mockups** — replace them with real captures from a live workspace before listing publicly. Remaining before listing: complete live-server verification below. Installs are free until platform credit charging goes live, at which point a `billing.recurring` block in `src/app.ts` is what charges workspaces.
 
 ## Install / dev
 
