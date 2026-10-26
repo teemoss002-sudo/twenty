@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # failure diagnostics are pushed to the ci-diagnostics branch
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -72,14 +72,15 @@ jobs:
           yarn test:integration 2>&1 | tee /tmp/integration.log
 
       # Raw job logs are not reachable from every environment; on failure,
-      # post the diagnostics as an issue so they stay readable anywhere.
+      # push the diagnostics to a disposable branch so they stay readable
+      # anywhere (repo Issues are disabled, artifacts/logs need blob access).
       - name: Publish failure diagnostics
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
-            echo 'Live CI failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            echo "Live CI failure diagnostics - run ${{ github.run_id }}"
             echo
             echo '## Integration test log (tail)'
             echo '```'
@@ -90,6 +91,10 @@ jobs:
             docker logs twenty-app-dev-test 2>&1 | tail -c 20000
             echo '```'
           } > /tmp/diagnostics.md
-          gh issue create \
-            --title "Live CI failure diagnostics (${{ github.run_id }})" \
-            --body-file /tmp/diagnostics.md
+          mkdir -p /tmp/diag-repo && cd /tmp/diag-repo
+          git init -q
+          git config user.email "ci@github-actions"
+          git config user.name "github-actions"
+          cp /tmp/diagnostics.md "run-${{ github.run_id }}.md"
+          git add . && git commit -qm "Live CI diagnostics ${{ github.run_id }}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:ci-diagnostics
