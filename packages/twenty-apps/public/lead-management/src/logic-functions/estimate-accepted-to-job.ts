@@ -147,7 +147,7 @@ export const resolveJobName = (estimateName?: string | null): string => {
 };
 
 /**
- * Build the createJob input. The payload is deliberately exact: name + status +
+ * Build the createServiceJob input. The payload is deliberately exact: name + status +
  * the estimate join column, and the customer join column only when the estimate
  * has a customer. Tests pin the key set so future edits cannot silently start
  * copying fields (e.g. a start date) that dispatch has to own.

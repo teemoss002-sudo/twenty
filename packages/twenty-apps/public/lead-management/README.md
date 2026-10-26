@@ -107,7 +107,7 @@ databaseEventTriggerSettings: {
 
 | Write | Value |
 | --- | --- |
-| `createJob` | `name` = estimate name (fallback `Job from accepted estimate`), `status` = `SCHEDULED`, `estimateId` = the accepted estimate, `customerId` = the estimate's customer when set |
+| `createServiceJob` | `name` = estimate name (fallback `Job from accepted estimate`), `status` = `SCHEDULED`, `estimateId` = the accepted estimate, `customerId` = the estimate's customer when set |
 | `updateOpportunity` | `leadStage` = `WON`, **only** when the lead exists and is not already Won |
 
 Nothing else is copied: `scheduledStart`/`scheduledEnd`, `serviceType`, `assignedTech` and `techNotes` stay manual, so the automation never invents a dispatch decision.
@@ -201,11 +201,13 @@ Post-install runs on fresh installs only (`previousVersion === undefined`). The 
 
 ## Known risks / safe failure modes
 
+- **`job`/`jobs` are reserved metadata names on current Twenty servers** (`RESERVED_METADATA_NAME_KEYWORDS` — there is a core jobs concept), and app sync rejects them as hard validation errors. The Job object is therefore `serviceJob`/`serviceJobs` in the API (GraphQL: `serviceJobs`, `createServiceJob`) and \"Job\" only in labels; likewise the reverse relation fields on Estimate/Person/WorkspaceMember are named `serviceJobs`. UIDs are unchanged, so the rename is sync-safe for any workspace that somehow has the old names (none shipped). The live CI run caught this — the local manifest build does not check server reserved names. Pinned by `manifest-invariants.test.ts`.
+
 - **SDK constants are stubbed inside built function bundles** (`stub-twenty-sdk-define.plugin.ts`): any non-`define*` import from `twenty-sdk/define` — including `STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS` — renders as an empty string at runtime. Runtime code (handlers) must use literal UIDs; `lead-labels.test.ts` pins the literal to the real SDK value to catch upstream drift. Manifest code (objects/fields/views) is unaffected.
 - Gate A is source-verified against this repo's server code; the residual risks are server-version drift (the editable-properties list or filter API changing upstream) and the app token being denied the metadata mutation. Both fail safe: the hook logs and the workspace keeps "Opportunity".
 - Standard-field references (`opportunity.fields.name`, `.owner`, `.pointOfContact`) are doc-verified and used in **manifest** code only; any drift fails at manifest build, not runtime.
 - View filters are literal values, so "My Leads" is scoped by the Sales Rep role predicate rather than a current-user filter (admins see all).
 - The automation writes select values as literals (`ACCEPTED`, `WON`, `SCHEDULED`) and reads `estimate.updated` / `status`. Those strings mirror the manifest definitions and are pinned by `estimate-accepted-to-job.test.ts` + `manifest-invariants.test.ts`; renaming an option or field in the manifest requires updating the literal in the same change, or the trigger becomes a silent no-op.
-- The automation's object permissions ship in the same manifest as the role. On a workspace that already has the app installed, the app must be upgraded/re-synced before the new Job/Opportunity overrides exist; until then `createJob` fails with `PERMISSION_DENIED` (logged, retried, and safe to replay because creation is read-guarded).
+- The automation's object permissions ship in the same manifest as the role. On a workspace that already has the app installed, the app must be upgraded/re-synced before the new Job/Opportunity overrides exist; until then `createServiceJob` fails with `PERMISSION_DENIED` (logged, retried, and safe to replay because creation is read-guarded).
 - Duplicate protection keys off the Job → estimate link. If the auto-created Job is deleted and the estimate emits another accepted event, a new Job is created; if a user manually creates a Job for that estimate first, the automation reuses it (any status) rather than adding a second one.
 - Database-event delivery needs the server worker; `yarn twenty dev` alone only syncs metadata. The smoke test cannot cover the HTTP round-trip because `CoreApiClient` is generated only against a live workspace.

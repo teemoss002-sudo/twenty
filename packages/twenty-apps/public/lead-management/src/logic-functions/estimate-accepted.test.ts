@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 //   5. failed create → rejects (queue retries) and never writes the lead;
 //   6. missing estimate / deleted lead → safe no-ops.
 // The query order asserted here is the handler's contract:
-//   estimates → jobs → createJob? → opportunities → updateOpportunity?
+//   estimates → serviceJobs → createServiceJob? → opportunities → updateOpportunity?
 
 const { queryMock, mutationMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
@@ -62,7 +62,7 @@ const mockEstimateQuery = (
 
 const mockJobsQuery = (node: Record<string, unknown> | null): void => {
   queryMock.mockResolvedValueOnce({
-    jobs: { edges: node ? [{ node }] : [] },
+    serviceJobs: { edges: node ? [{ node }] : [] },
   });
 };
 
@@ -112,7 +112,7 @@ describe('accepted transition', () => {
     mockJobsQuery(null);
     mockLeadQuery({ id: LEAD_ID, leadStage: 'QUALIFIED' });
     mutationMock
-      .mockResolvedValueOnce({ createJob: { id: JOB_ID } })
+      .mockResolvedValueOnce({ createServiceJob: { id: JOB_ID } })
       .mockResolvedValueOnce({ updateOpportunity: { id: LEAD_ID } });
 
     const result = await handler(buildEvent());
@@ -126,7 +126,7 @@ describe('accepted transition', () => {
       leadStageUpdated: true,
     });
 
-    const jobQuery = queryMock.mock.calls[1][0].jobs;
+    const jobQuery = queryMock.mock.calls[1][0].serviceJobs;
 
     expect(jobQuery.__args).toEqual({
       filter: { estimateId: { eq: ESTIMATE_ID } },
@@ -134,7 +134,7 @@ describe('accepted transition', () => {
     });
 
     expect(mutationMock.mock.calls[0][0]).toEqual({
-      createJob: {
+      createServiceJob: {
         __args: {
           data: {
             name: 'Replace water heater',
@@ -177,7 +177,7 @@ describe('accepted transition', () => {
     mockEstimateQuery(acceptedEstimate);
     mockJobsQuery(null);
     mockLeadQuery({ id: LEAD_ID, leadStage: 'WON' });
-    mutationMock.mockResolvedValueOnce({ createJob: { id: JOB_ID } });
+    mutationMock.mockResolvedValueOnce({ createServiceJob: { id: JOB_ID } });
 
     const result = await handler(buildEvent());
 
@@ -187,13 +187,13 @@ describe('accepted transition', () => {
       leadStageUpdated: false,
     });
     expect(mutationMock).toHaveBeenCalledTimes(1);
-    expect(mutationMock.mock.calls[0][0]).toHaveProperty('createJob');
+    expect(mutationMock.mock.calls[0][0]).toHaveProperty('createServiceJob');
   });
 
   it('creates the job without a customer link when the estimate has none', async () => {
     mockEstimateQuery({ ...acceptedEstimate, customerId: null, leadId: null });
     mockJobsQuery(null);
-    mutationMock.mockResolvedValueOnce({ createJob: { id: JOB_ID } });
+    mutationMock.mockResolvedValueOnce({ createServiceJob: { id: JOB_ID } });
 
     const result = await handler(buildEvent());
 
@@ -204,7 +204,7 @@ describe('accepted transition', () => {
       leadStageUpdated: false,
     });
     expect(queryMock).toHaveBeenCalledTimes(2);
-    expect(mutationMock.mock.calls[0][0].createJob.__args.data).toEqual({
+    expect(mutationMock.mock.calls[0][0].createServiceJob.__args.data).toEqual({
       name: 'Replace water heater',
       status: 'SCHEDULED',
       estimateId: ESTIMATE_ID,
@@ -260,7 +260,7 @@ describe('safe no-ops', () => {
     mockEstimateQuery(acceptedEstimate);
     mockJobsQuery(null);
     mockLeadQuery(null);
-    mutationMock.mockResolvedValueOnce({ createJob: { id: JOB_ID } });
+    mutationMock.mockResolvedValueOnce({ createServiceJob: { id: JOB_ID } });
 
     const result = await handler(buildEvent());
 
@@ -278,14 +278,14 @@ describe('failure policy', () => {
     mockEstimateQuery(acceptedEstimate);
     mockJobsQuery(null);
     mutationMock.mockRejectedValueOnce(
-      new Error('permission denied on createJob'),
+      new Error('permission denied on createServiceJob'),
     );
     const consoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
 
     await expect(handler(buildEvent())).rejects.toThrow(
-      'permission denied on createJob',
+      'permission denied on createServiceJob',
     );
 
     expect(mutationMock).toHaveBeenCalledTimes(1);

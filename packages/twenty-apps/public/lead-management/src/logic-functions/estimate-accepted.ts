@@ -107,32 +107,32 @@ const findExistingJobForEstimate = async (
   client: CoreApiClient,
   estimateId: string,
 ): Promise<JobRecord | null> => {
-  const result = asResult<{ jobs?: Connection<JobRecord> }>(
+  const result = asResult<{ serviceJobs?: Connection<JobRecord> }>(
     await client.query({
-      jobs: {
+      serviceJobs: {
         __args: { filter: { estimateId: { eq: estimateId } }, first: 1 },
         edges: { node: JOB_SELECTION },
       },
     }),
   );
 
-  return firstNode(result.jobs);
+  return firstNode(result.serviceJobs);
 };
 
-const createJobFromEstimate = async (
+const createServiceJobFromEstimate = async (
   client: CoreApiClient,
   input: JobCreateInput,
 ): Promise<string> => {
-  const result = asResult<{ createJob?: { id?: string | null } | null }>(
+  const result = asResult<{ createServiceJob?: { id?: string | null } | null }>(
     await client.mutation({
-      createJob: { __args: { data: input }, id: true },
+      createServiceJob: { __args: { data: input }, id: true },
     }),
   );
 
-  const jobId = result.createJob?.id;
+  const jobId = result.createServiceJob?.id;
 
   if (!jobId) {
-    throw new Error('createJob returned no record id');
+    throw new Error('createServiceJob returned no record id');
   }
 
   return jobId;
@@ -209,7 +209,7 @@ export const handler = async (
     const existingJob = await findExistingJobForEstimate(client, estimate.id);
     const jobId =
       existingJob?.id ??
-      (await createJobFromEstimate(client, buildJobCreateInput(estimate)));
+      (await createServiceJobFromEstimate(client, buildJobCreateInput(estimate)));
 
     let leadStageUpdated = false;
 

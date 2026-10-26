@@ -147,7 +147,13 @@ describe('standard object safety', () => {
     // The build enforces one defineObject per file; this asserts no new custom
     // object was accidentally introduced to "replace" the standard one.
     expect(estimateObject.config.nameSingular).toBe('estimate');
-    expect(jobObject.config.nameSingular).toBe('job');
+    // 'job'/'jobs' are reserved metadata keywords on current servers
+    // (RESERVED_METADATA_NAME_KEYWORDS) — sync rejects them outright.
+    // The object is 'serviceJob' in the API, 'Job' in labels only.
+    expect(jobObject.config.nameSingular).toBe('serviceJob');
+    expect(jobObject.config.namePlural).toBe('serviceJobs');
+    expect(['job', 'jobs']).not.toContain(jobObject.config.nameSingular);
+    expect(['job', 'jobs']).not.toContain(jobObject.config.namePlural);
   });
 
   it('the ONE_TO_MANY estimates reverse field attaches to the STANDARD Opportunity', () => {

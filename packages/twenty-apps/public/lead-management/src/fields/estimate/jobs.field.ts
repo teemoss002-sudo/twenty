@@ -17,7 +17,7 @@ export default defineField({
   universalIdentifier: JOBS_ON_ESTIMATE_FIELD_UNIVERSAL_IDENTIFIER,
   objectUniversalIdentifier: ESTIMATE_OBJECT_UNIVERSAL_IDENTIFIER,
   type: FieldType.RELATION,
-  name: 'jobs',
+  name: 'serviceJobs',
   label: 'Jobs',
   icon: 'IconTool',
   relationTargetObjectMetadataUniversalIdentifier:

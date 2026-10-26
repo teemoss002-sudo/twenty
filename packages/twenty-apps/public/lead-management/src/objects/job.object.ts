@@ -39,8 +39,8 @@ enum ServiceType {
 // keeping relations out of defineObject's inline field list.
 export default defineObject({
   universalIdentifier: JOB_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'job',
-  namePlural: 'jobs',
+  nameSingular: 'serviceJob',
+  namePlural: 'serviceJobs',
   labelSingular: 'Job',
   labelPlural: 'Jobs',
   description: 'A piece of scheduled work performed for a customer.',

@@ -69,16 +69,18 @@ async function waitFor<T>(
 type JobNode = { id: string; name: string; status: string; estimateId: string };
 
 async function findJobsForEstimate(estimateId: string): Promise<JobNode[]> {
-  const data = await graphql<{ jobs: { edges: Array<{ node: JobNode }> } }>(
+  const data = await graphql<{
+    serviceJobs: { edges: Array<{ node: JobNode }> };
+  }>(
     `query JobsForEstimate($estimateId: String!) {
-      jobs(filter: { estimateId: { eq: $estimateId } }) {
+      serviceJobs(filter: { estimateId: { eq: $estimateId } }) {
         edges { node { id name status estimateId } }
       }
     }`,
     { estimateId },
   );
 
-  return data.jobs.edges.map((edge) => edge.node);
+  return data.serviceJobs.edges.map((edge) => edge.node);
 }
 
 async function findLeadStage(opportunityId: string): Promise<string | undefined> {
