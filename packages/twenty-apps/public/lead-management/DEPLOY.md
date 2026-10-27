@@ -4,27 +4,32 @@ Goal: a live Twenty + JobFlow at a public address you can open on your
 phone, demo to clients, and send as a link. Total cost ≈ $5–10/month.
 Everything below is done in your phone browser + a terminal app.
 
-## 1. Rent the server (Hetzner Cloud)
+## 1. Rent the server (Vultr — no ID check)
 
-1. Go to **hetzner.com/cloud** → sign up → verify your email (they may ask
-   for ID/payment method).
-2. Create a project: **JobFlow Demo**.
-3. **Add server**:
-   - Location: **Ashburn** or **Hillsboro** (US)
-   - Image: **Ubuntu 24.04**
-   - Type: **CPX21** (2 CPU / 4 GB) — CPX11 is too small
-   - SSH key: skip it — Hetzner emails you a root password instead
-4. Create it, copy the server's **IP address** (e.g. `203.0.113.10`), and
-   check your email for the root password.
+Hetzner wants photo ID or a $25 prepayment; Vultr does not — just email +
+card (or PayPal). ~$12/month, billed hourly, cancel anytime.
+
+1. Go to **vultr.com** → sign up → verify your email, add a payment method.
+2. **Deploy New Server** → **Cloud Compute (Shared CPU)**.
+3. Choose:
+   - Location: **Dallas** or **Chicago** (any US city is fine)
+   - Image: **Ubuntu 24.04 LTS**
+   - Plan: 2 vCPU / 4 GB if you see it (~$24/mo); the 2 GB plan (~$12/mo)
+     also works — step 2 adds swap so it doesn't run out of memory
+   - Hostname/label: `jobflow-demo`
+4. **Deploy Now**, wait ~1 minute, copy the server's **IP address** and the
+   **root password** shown on the server page (no email hunting — it's in
+   the dashboard).
 
 ## 2. Install Twenty on it
 
-Open the terminal: either the **Console** button on the server's Hetzner
+Open the terminal: either the **View Console** button on the server's Vultr
 page (works in your browser), or the free **Termius** app (host = the IP,
-user `root`, password from the email). Paste this block, replacing
+user `root`, password from the Vultr server page). Paste this block, replacing
 `YOUR_IP` with the server IP:
 
 ```bash
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 curl -fsSL https://get.docker.com | sh
 mkdir -p ~/twenty && cd ~/twenty
 curl -O https://raw.githubusercontent.com/twentyhq/twenty/main/packages/twenty-docker/docker-compose.yml
@@ -40,8 +45,8 @@ docker compose up -d
 
 Wait ~2 minutes, then open **http://YOUR_IP:3000** in your phone browser —
 you should see the Twenty sign-up screen. If it doesn't load, check the
-Hetzner server page → **Firewalls**: none should be blocking port 3000
-(by default there is no firewall — good).
+server page: Vultr doesn't add a cloud firewall by default, so port 3000
+is open — good.
 
 ## 3. Create your account + workspace
 
@@ -87,9 +92,10 @@ the app upgrades.
 
 ## Notes
 
-- **Cost control:** when you're not demoing, Hetzner → server →
-  **Power off** stops compute billing (disk is pennies). Power on takes
-  ~1 minute; your data and address stay.
+- **Cost control:** billing is hourly — when you're done selling for
+  a while, Vultr → server → **Destroy** ends all charges (the demo data
+  goes with it; re-run steps 2–6 to rebuild in ~15 min). A stopped
+  server still bills, so destroy beats stop here.
 - **Security reality check:** this demo is plain HTTP on a public IP —
   fine for fake demo data, never put real client info in it. A domain +
   HTTPS is the upgrade when it becomes a client-facing asset.
