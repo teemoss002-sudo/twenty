@@ -1,0 +1,73 @@
+name: Deploy JobFlow Demo
+
+# One-button deploy of the JobFlow app to your own Twenty server (the VPS
+# demo instance — see packages/twenty-apps/public/lead-management/DEPLOY.md).
+# Manual only: Actions tab -> "Deploy JobFlow Demo" -> Run workflow.
+#
+# Requires two repository secrets (Settings -> Secrets and variables ->
+# Actions):
+#   TWENTY_DEPLOY_URL      e.g. http://203.0.113.10:3000
+#   TWENTY_DEPLOY_API_KEY  API key from that instance (Settings ->
+#                          Developers / API keys), admin of the workspace
+#
+# Each press auto-bumps the app patch version in the runner before
+# deploying, because the server rejects re-deploying the same version
+# (VERSION_ALREADY_EXISTS). The bump is runner-local; the committed
+# version in package.json moves only on real releases.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-jobflow-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: packages/twenty-apps/public/lead-management
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Check deploy secrets are configured
+        env:
+          DEPLOY_URL: ${{ secrets.TWENTY_DEPLOY_URL }}
+          DEPLOY_KEY: ${{ secrets.TWENTY_DEPLOY_API_KEY }}
+        run: |
+          if [ -z "$DEPLOY_URL" ] || [ -z "$DEPLOY_KEY" ]; then
+            echo "::error::Missing secrets. Add TWENTY_DEPLOY_URL and TWENTY_DEPLOY_API_KEY under Settings -> Secrets and variables -> Actions (see DEPLOY.md step 5)."
+            exit 1
+          fi
+
+      - name: Bump patch version (runner-local)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const parts = pkg.version.split('.').map(Number);
+            parts[2] += 1;
+            pkg.version = parts.join('.');
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Deploying version', pkg.version);
+          "
+
+      - name: Deploy app (private tarball)
+        uses: ./.github/actions/deploy-twenty-app
+        with:
+          api-url: ${{ secrets.TWENTY_DEPLOY_URL }}
+          api-key: ${{ secrets.TWENTY_DEPLOY_API_KEY }}
+          app-path: ${{ env.APP_DIR }}
+
+      - name: Install / upgrade app on the workspace
+        uses: ./.github/actions/install-twenty-app
+        with:
+          api-url: ${{ secrets.TWENTY_DEPLOY_URL }}
+          api-key: ${{ secrets.TWENTY_DEPLOY_API_KEY }}
+          app-path: ${{ env.APP_DIR }}
