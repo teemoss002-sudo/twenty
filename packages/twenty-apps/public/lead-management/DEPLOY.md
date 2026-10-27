@@ -4,31 +4,35 @@ Goal: a live Twenty + JobFlow at a public address you can open on your
 phone, demo to clients, and send as a link. Total cost ≈ $5–10/month.
 Everything below is done in your phone browser + a terminal app.
 
-## 1. Rent the server (Vultr — no ID check)
+## 1. Rent the server (Ubicloud — card on file, no ID check)
 
-Hetzner wants photo ID or a $25 prepayment; Vultr does not — just email +
-card (or PayPal). ~$12/month, billed hourly, cancel anytime.
+Ubicloud is an open-source cloud (AWS-style VMs) that only needs a valid
+credit card on file — no photo ID, no prepayment. Billed per minute.
 
-1. Go to **vultr.com** → sign up → verify your email, add a payment method.
-2. **Deploy New Server** → **Cloud Compute (Shared CPU)**.
-3. Choose:
-   - Location: **Dallas** or **Chicago** (any US city is fine)
-   - Image: **Ubuntu 24.04 LTS**
-   - Plan: 2 vCPU / 4 GB if you see it (~$24/mo); the 2 GB plan (~$12/mo)
-     also works — step 2 adds swap so it doesn't run out of memory
-   - Hostname/label: `jobflow-demo`
-4. **Deploy Now**, wait ~1 minute, copy the server's **IP address** and the
-   **root password** shown on the server page (no email hunting — it's in
-   the dashboard).
+**First, make an SSH key on your phone** (Ubicloud has no root passwords):
+open the free **Termius** app → Keychain → **Generate key** (Ed25519) →
+open it → copy the **public key** (long text starting `ssh-ed25519`).
+
+1. Go to **ubicloud.com** → sign up → add your credit card (Billing).
+2. **Compute → New Virtual Machine**:
+   - Location: **Virginia** (US) or Germany — either works
+   - Size: **burstable-2** (2 CPU / 4 GB, ~$21/mo) — burstable-1
+     (1 CPU / 2 GB, ~$8/mo + $3 public IPv4) also works; step 2 adds swap
+   - OS: **Ubuntu 24.04**
+   - SSH key: paste the public key from Termius
+   - Keep **public IPv4** enabled (+$3/mo — you need it)
+3. Create it, copy the VM's **public IPv4 address**.
+4. On the VM page, open **Firewall** and add an ingress rule:
+   **TCP port 3000, source 0.0.0.0/0** (SSH port 22 is already allowed).
 
 ## 2. Install Twenty on it
 
-Open the terminal: either the **View Console** button on the server's Vultr
-page (works in your browser), or the free **Termius** app (host = the IP,
-user `root`, password from the Vultr server page). Paste this block, replacing
-`YOUR_IP` with the server IP:
+Open **Termius** → new host: address = the VM's public IPv4, username
+`ubi`, key = the key you generated. Connect, then become root and paste
+the block below (replacing `YOUR_IP` with the VM's IPv4):
 
 ```bash
+sudo -i
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 curl -fsSL https://get.docker.com | sh
 mkdir -p ~/twenty && cd ~/twenty
@@ -45,8 +49,8 @@ docker compose up -d
 
 Wait ~2 minutes, then open **http://YOUR_IP:3000** in your phone browser —
 you should see the Twenty sign-up screen. If it doesn't load, check the
-server page: Vultr doesn't add a cloud firewall by default, so port 3000
-is open — good.
+you skipped the firewall rule in step 1 —
+add the TCP 3000 ingress rule on the VM's Firewall tab and reload.
 
 ## 3. Create your account + workspace
 
@@ -93,7 +97,7 @@ the app upgrades.
 ## Notes
 
 - **Cost control:** billing is hourly — when you're done selling for
-  a while, Vultr → server → **Destroy** ends all charges (the demo data
+  a while, Ubicloud → VM → **Destroy** ends all charges (the demo data
   goes with it; re-run steps 2–6 to rebuild in ~15 min). A stopped
   server still bills, so destroy beats stop here.
 - **Security reality check:** this demo is plain HTTP on a public IP —
