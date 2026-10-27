@@ -4,36 +4,27 @@ Goal: a live Twenty + JobFlow at a public address you can open on your
 phone, demo to clients, and send as a link. Total cost ≈ $5–10/month.
 Everything below is done in your phone browser + a terminal app.
 
-## 1. Rent the server (Ubicloud — card on file, no ID check)
+## 1. Rent the server (Hetzner Cloud)
 
-Ubicloud is an open-source cloud (AWS-style VMs) that only needs a valid
-credit card on file — no photo ID, no prepayment. Billed per minute.
-
-**First, make an SSH key on your phone** (Ubicloud has no root passwords):
-open the free **Termius** app → Keychain → **Generate key** (Ed25519) →
-open it → copy the **public key** (long text starting `ssh-ed25519`).
-
-1. Go to **ubicloud.com** → sign up → add your credit card (Billing).
-2. **Compute → New Virtual Machine**:
-   - Location: **Virginia** (US) or Germany — either works
-   - Size: **burstable-2** (2 CPU / 4 GB, ~$21/mo) — burstable-1
-     (1 CPU / 2 GB, ~$8/mo + $3 public IPv4) also works; step 2 adds swap
-   - OS: **Ubuntu 24.04**
-   - SSH key: paste the public key from Termius
-   - Keep **public IPv4** enabled (+$3/mo — you need it)
-3. Create it, copy the VM's **public IPv4 address**.
-4. On the VM page, open **Firewall** and add an ingress rule:
-   **TCP port 3000, source 0.0.0.0/0** (SSH port 22 is already allowed).
+1. Go to **hetzner.com/cloud** → sign up → verify your email (they may ask
+   for ID/payment method).
+2. Create a project: **JobFlow Demo**.
+3. **Add server**:
+   - Location: **Ashburn** or **Hillsboro** (US)
+   - Image: **Ubuntu 24.04**
+   - Type: **CPX21** (2 CPU / 4 GB) — CPX11 is too small
+   - SSH key: skip it — Hetzner emails you a root password instead
+4. Create it, copy the server's **IP address** (e.g. `203.0.113.10`), and
+   check your email for the root password.
 
 ## 2. Install Twenty on it
 
-Open **Termius** → new host: address = the VM's public IPv4, username
-`ubi`, key = the key you generated. Connect, then become root and paste
-the block below (replacing `YOUR_IP` with the VM's IPv4):
+Open the terminal: either the **Console** button on the server's Hetzner
+page (works in your browser), or the free **Termius** app (host = the IP,
+user `root`, password from the email). Paste this block, replacing
+`YOUR_IP` with the server IP:
 
 ```bash
-sudo -i
-fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 curl -fsSL https://get.docker.com | sh
 mkdir -p ~/twenty && cd ~/twenty
 curl -O https://raw.githubusercontent.com/twentyhq/twenty/main/packages/twenty-docker/docker-compose.yml
@@ -49,8 +40,8 @@ docker compose up -d
 
 Wait ~2 minutes, then open **http://YOUR_IP:3000** in your phone browser —
 you should see the Twenty sign-up screen. If it doesn't load, check the
-you skipped the firewall rule in step 1 —
-add the TCP 3000 ingress rule on the VM's Firewall tab and reload.
+Hetzner server page → **Firewalls**: none should be blocking port 3000
+(by default there is no firewall — good).
 
 ## 3. Create your account + workspace
 
@@ -96,10 +87,9 @@ the app upgrades.
 
 ## Notes
 
-- **Cost control:** billing is hourly — when you're done selling for
-  a while, Ubicloud → VM → **Destroy** ends all charges (the demo data
-  goes with it; re-run steps 2–6 to rebuild in ~15 min). A stopped
-  server still bills, so destroy beats stop here.
+- **Cost control:** when you're not demoing, Hetzner → server →
+  **Power off** stops compute billing (disk is pennies). Power on takes
+  ~1 minute; your data and address stay.
 - **Security reality check:** this demo is plain HTTP on a public IP —
   fine for fake demo data, never put real client info in it. A domain +
   HTTPS is the upgrade when it becomes a client-facing asset.
