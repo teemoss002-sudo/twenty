@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "smoke": "node scripts/runtime-smoke.mjs && node scripts/runtime-smoke-estimate-accepted.mjs && node scripts/runtime-smoke-job-completed.mjs && node scripts/runtime-smoke-job-schedule.mjs"
+    "smoke": "node scripts/runtime-smoke.mjs && node scripts/runtime-smoke-estimate-accepted.mjs && node scripts/runtime-smoke-job-completed.mjs && node scripts/runtime-smoke-job-schedule.mjs",
+    "live-test": "node scripts/live-e2e.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

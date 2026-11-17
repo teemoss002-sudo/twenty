@@ -174,6 +174,19 @@ Same mechanics as the estimate handoff (server-verified trigger matching, app to
 
 **Live workspace verification: BLOCKED/DEFERRED (environment limitation).** `yarn twenty dev:function:exec --postInstall` requires a Twenty server at `localhost:2020`; the current sandbox has no server, no Docker, no Postgres/Redis. Run it once a server or remote workspace is available (it is also exercised automatically on first `app:publish` + install). Until then, Gate A behavior is covered end-to-end by `yarn smoke` against a mock metadata API; the real-run risk (workspace rejecting the relabel) fails safe by design — the workspace keeps "Opportunity".
 
+## Live testing (real workspace)
+
+`scripts/live-e2e.mjs` (`yarn live-test`) drives every automation through a real Twenty server and worker: app objects present, Opportunity relabelled "Lead", estimate accepted → lead Won + exactly one Scheduled job, re-accept creates no second job, job completed → one Draft invoice with the estimate's amount and line items, and two overlapping jobs for one tech flagged then cleared after a reschedule.
+
+Setup, against a **test** workspace (the app relabels Opportunity and adds Estimate / Job / Invoice wherever it is synced):
+
+1. `yarn twenty remote:add --url https://<workspace>` — connect the CLI.
+2. `yarn twenty apply`, then `yarn twenty dev:function:exec --postInstall` — sync the app and run the relabel (dev syncs don't run install hooks). Dev-synced apps get a LOCAL application registration, so their database-event functions do fire.
+3. Create `.env.live` (gitignored) with `TWENTY_LIVE_URL=` and `TWENTY_LIVE_API_KEY=` (Settings → APIs & Webhooks).
+4. `yarn live-test` — test records are labelled "JobFlow live test …" and moved to the trash afterwards (`--keep` leaves them for inspection). Schedule test jobs are booked in January 2099 so they cannot collide with real bookings.
+
+Not yet run: no live workspace has been connected from the development machine so far.
+
 ## Install / dev
 
 ```bash
