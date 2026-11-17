@@ -1,16 +1,21 @@
 import { defineApplicationRole } from 'twenty-sdk/define';
 
 import { DEFAULT_ROLE_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
+import { JOB_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
+import { OPPORTUNITY_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/opportunity.object';
 
 // Exactly one defineApplicationRole per app (manifest-build enforced). This
-// role governs the app's own runtime token: broad read, no record writes, and
-// settings access so the post-install hook can attempt the Gate A metadata
-// mutation (relabel Opportunity → Lead).
+// role governs the app's own runtime token: broad read, settings access so the
+// post-install hook can attempt the Gate A metadata mutation (relabel
+// Opportunity → Lead), and record writes on exactly the two objects the
+// estimate-accepted handoff touches (Lead stage → Won, new Job). Record inserts
+// are authorised by canUpdateObjectRecords on the server; nothing here can
+// delete or destroy records.
 export default defineApplicationRole({
   universalIdentifier: DEFAULT_ROLE_UNIVERSAL_IDENTIFIER,
   label: 'JobFlow Lead Management — function role',
   description:
-    'Runtime role for JobFlow Lead Management logic functions: read all records, no record writes, settings access for post-install workspace configuration.',
+    'Runtime role for JobFlow Lead Management logic functions: read all records, create/update Leads and Jobs for the estimate-accepted handoff, settings access for post-install workspace configuration.',
   canReadAllObjectRecords: true,
   canUpdateAllObjectRecords: false,
   canSoftDeleteAllObjectRecords: false,
@@ -19,7 +24,22 @@ export default defineApplicationRole({
   canBeAssignedToAgents: false,
   canBeAssignedToUsers: false,
   canBeAssignedToApiKeys: false,
-  objectPermissions: [],
+  objectPermissions: [
+    {
+      objectUniversalIdentifier: OPPORTUNITY_OBJECT_UNIVERSAL_IDENTIFIER,
+      canReadObjectRecords: true,
+      canUpdateObjectRecords: true,
+      canSoftDeleteObjectRecords: false,
+      canDestroyObjectRecords: false,
+    },
+    {
+      objectUniversalIdentifier: JOB_OBJECT_UNIVERSAL_IDENTIFIER,
+      canReadObjectRecords: true,
+      canUpdateObjectRecords: true,
+      canSoftDeleteObjectRecords: false,
+      canDestroyObjectRecords: false,
+    },
+  ],
   fieldPermissions: [],
   permissionFlagUniversalIdentifiers: [],
 });

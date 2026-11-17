@@ -134,6 +134,9 @@ export const LEAD_TAB_WIDGET_OWNER_NOTES_UNIVERSAL_IDENTIFIER =
 // Logic functions.
 export const POST_INSTALL_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
   'd0a0d0a0-0000-4000-8000-000000000601';
+// Estimate → Lead → Job handoff (database event: estimate.updated / status).
+export const ESTIMATE_ACCEPTED_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  'd0a0d0a0-0000-4000-8000-000000000602';
 
 // -----------------------------------------------------------------------------
 // Layer 2 — Estimate + Job custom objects (JobFlow core workflow:

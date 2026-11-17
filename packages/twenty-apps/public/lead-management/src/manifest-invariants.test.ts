@@ -12,6 +12,8 @@ import { describe, expect, it } from 'vitest';
 //   4. every view field references a field that exists on the view's object
 //   5. navigation items point at views/objects that exist in this app
 //   6. the record-page tab targets the standard Opportunity record page layout
+//   7. the function role writes only the objects the estimate-accepted handoff
+//      touches, and can never delete or destroy records
 
 import application from 'src/app';
 import estimateObject from 'src/objects/estimate.object';
@@ -44,6 +46,10 @@ import estimatesNavItem from 'src/navigation-menu-items/estimates.navigation-men
 import jobsNavItem from 'src/navigation-menu-items/jobs.navigation-menu-item';
 
 import leadPageLayoutTab from 'src/page-layout-tabs/lead.page-layout-tab';
+import defaultRole from 'src/roles/default-role';
+import salesRepRole from 'src/roles/sales-rep.role';
+import postInstallFunction from 'src/logic-functions/post-install';
+import estimateAcceptedFunction from 'src/logic-functions/on-estimate-accepted';
 import { LEAD_RECORD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER } from 'src/page-layouts/lead.page-layout';
 import { LEAD_STAGE_FIELD_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
@@ -122,6 +128,10 @@ describe('universal identifier uniqueness', () => {
       estimatesNavItem.config,
       jobsNavItem.config,
       leadPageLayoutTab.config,
+      defaultRole.config,
+      salesRepRole.config,
+      postInstallFunction.config,
+      estimateAcceptedFunction.config,
     ];
 
     const universalIdentifiers = allEntities.map(
@@ -322,5 +332,29 @@ describe('navigation and page layout wiring', () => {
     expect(leadPageLayoutTab.config.pageLayoutUniversalIdentifier).toBe(
       LEAD_RECORD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER,
     );
+  });
+});
+
+describe('function role permissions', () => {
+  it('grants record writes on exactly the Lead (Opportunity) and Job objects', () => {
+    const writableObjects = (defaultRole.config.objectPermissions ?? [])
+      .filter((permission) => permission.canUpdateObjectRecords)
+      .map((permission) => permission.objectUniversalIdentifier)
+      .sort();
+
+    expect(defaultRole.config.canUpdateAllObjectRecords).toBe(false);
+    expect(writableObjects).toEqual(
+      [OPPORTUNITY_OBJECT_UNIVERSAL_IDENTIFIER, jobObject.config.universalIdentifier].sort(),
+    );
+  });
+
+  it('can never delete or destroy records', () => {
+    expect(defaultRole.config.canSoftDeleteAllObjectRecords).toBe(false);
+    expect(defaultRole.config.canDestroyAllObjectRecords).toBe(false);
+
+    for (const permission of defaultRole.config.objectPermissions ?? []) {
+      expect(permission.canSoftDeleteObjectRecords).toBe(false);
+      expect(permission.canDestroyObjectRecords).toBe(false);
+    }
   });
 });

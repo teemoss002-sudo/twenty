@@ -9,6 +9,8 @@ import {
 
 import { POST_INSTALL_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
+import { resolveApiAccess } from './api-access';
+
 import {
   assertOpportunityIdentityPreserved,
   buildFindOpportunityObjectIdQuery,
@@ -51,17 +53,14 @@ type ObjectMetadataNode = {
 const requestMetadataApi = async (
   query: string,
 ): Promise<Record<string, unknown>> => {
-  const apiUrl = process.env.API_URL;
-  const appAccessToken = process.env.APP_ACCESS_TOKEN;
+  // Current servers inject TWENTY_-prefixed names only; reading the old
+  // unprefixed ones made this hook fall back on every install.
+  const { apiUrl, accessToken } = resolveApiAccess(process.env);
 
-  if (!apiUrl || !appAccessToken) {
-    throw new Error('APP_ACCESS_TOKEN / API_URL are not injected');
-  }
-
-  const response = await fetch(`${apiUrl.replace(/\/+$/, '')}/metadata`, {
+  const response = await fetch(`${apiUrl}/metadata`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${appAccessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query }),

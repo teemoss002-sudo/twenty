@@ -3,7 +3,7 @@
 // Executes the BUILT function bundle (.twenty/output/src/logic-functions/
 // post-install.mjs) — the same artifact the Twenty server would execute —
 // against a mock workspace metadata API. Verifies at runtime:
-//   1. env injection requirement (fails loudly without APP_ACCESS_TOKEN)
+//   1. env injection: reads the TWENTY_-prefixed names the server injects
 //   2. id resolution query against the standard Opportunity universal id
 //   3. updateOneObject mutation carries exactly labelSingular/labelPlural/
 //      description and NEVER nameSingular/namePlural
@@ -110,8 +110,11 @@ const record = (name, ok, detail = '') => {
 
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;
-process.env.API_URL = `http://127.0.0.1:${port}`;
-process.env.APP_ACCESS_TOKEN = 'smoke-test-token';
+// The names twenty-server injects (twenty-shared/application constants). An
+// install hook has no triggering person, so both tokens are the app's own.
+process.env.TWENTY_API_URL = `http://127.0.0.1:${port}`;
+process.env.TWENTY_APP_ACCESS_TOKEN = 'smoke-test-token';
+process.env.TWENTY_APP_APPLICATION_ACCESS_TOKEN = 'smoke-test-token';
 
 try {
   const mod = await import(
