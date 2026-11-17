@@ -31,6 +31,9 @@ Estimate status → Accepted  ──(estimate.updated / status)──▶  Lead s
                                                            ▶  Job created (Scheduled)
 Job status → Completed      ──(job.updated / status)───────▶  Draft Invoice created
                                                               (amount + line items from the estimate)
+Any job event (create/delete/restore, or start/end/tech/status change)
+                            ──(job.*)──────────────────────▶  Tech's schedule rechecked:
+                                                              scheduleConflict / conflictDetails flagged or cleared
 ```
 
 - **No `defineObject()` call exists.** The object keeps `nameSingular: 'opportunity'`; "Lead" is presentation only.
@@ -58,6 +61,9 @@ Job status → Completed      ──(job.updated / status)───────�
 | `src/logic-functions/on-job-completed.ts` | Job-completed invoice handoff: database-event logic function (`job.updated`, `status`) |
 | `src/logic-functions/job-completed.ts` | Invoice handoff decision logic, GraphQL documents, payload builders (no SDK runtime imports) |
 | `src/logic-functions/job-completed.test.ts` | Unit tests: literals pinned to manifests, transition rules, estimate prefill, retry-safe handler flow |
+| `src/logic-functions/on-job-schedule-changed.ts` | Tech double-booking check: database-event logic function (`job.*`) |
+| `src/logic-functions/job-schedule.ts` | Conflict rules (overlap, back-to-back, ends-before-start), event planning, GraphQL documents |
+| `src/logic-functions/job-schedule.test.ts` | Unit tests: literals pinned to manifests, no self-trigger, conflict rules, reassign/complete/delete clearing, paging |
 | `src/logic-functions/workspace-api.ts` | Shared record-API (GraphQL) client for the handoffs |
 | `src/logic-functions/api-access.ts` | Shared env resolution for all logic functions (`TWENTY_API_URL`, app token first) |
 | `src/logic-functions/api-access.test.ts` | Unit tests: injected env names and token preference |
@@ -77,6 +83,8 @@ Job status → Completed      ──(job.updated / status)───────�
 | `src/views/all-invoices.view.ts`, `src/views/unpaid-invoices.view.ts` | Invoices table; Unpaid (Draft + Sent) sorted by due date |
 | `src/views/invoice-record-page-fields.view.ts`, `src/page-layouts/invoice.page-layout.ts` | Invoice record page: Home (fields) + Timeline tabs |
 | `src/navigation-menu-items/invoices.navigation-menu-item.ts` | Sidebar "Invoices" (7, after Jobs) |
+| `src/views/job-calendar.view.ts` | **Job Calendar**: week calendar placed by scheduledStart → scheduledEnd |
+| `src/views/schedule-conflicts.view.ts` | **Schedule Conflicts**: jobs with `scheduleConflict = true`, soonest first |
 
 ## Fields added to Opportunity
 
@@ -123,6 +131,14 @@ The manifest **cannot rewrite the options of the core `stage` field** (`defineFi
 
 **Retries:** the server re-queues a failed run up to 3 times. The lead update runs first and is idempotent; the job is created last and only if none exists for the estimate, so a retry after a partial failure completes the work without duplicates. API errors are thrown, not swallowed, so failures show up in the function logs.
 
+## Scheduling — Job Calendar + tech double-booking check
+
+- **Job Calendar** (Jobs → views): week calendar of jobs from `scheduledStart` to `scheduledEnd`, showing tech, status, customer and the conflict flag.
+- **Double-booking check** (`src/logic-functions/on-job-schedule-changed.ts`): Twenty apps react to saves and cannot block them, so conflicts are **flagged**, not prevented. Job gains `scheduleConflict` (BOOLEAN) and `conflictDetails` (TEXT, e.g. "Overlaps Job for Roof repair, Job for Furnace and 2 more" or "Ends before it starts"). They are written only by the check — a hand edit would be overwritten on the next schedule change.
+- **Rules:** two active jobs (Scheduled / En Route / In Progress) for the same tech overlap when each starts before the other ends; back-to-back jobs are fine; jobs missing a start or end are not checked; Completed and Cancelled jobs never conflict.
+- **How it runs:** on every job event (`job.*`): creates, deletes, restores, and updates that touch `scheduledStart`, `scheduledEnd`, the assigned tech or `status`. Each run recomputes the full active schedule of every tech involved (old and new tech on a reassignment) and writes only flags that changed. That makes it retry-safe and self-healing: moving, reassigning, completing, cancelling or deleting a job also clears the flags it caused on other jobs. The flag fields are not trigger fields, so the check's own writes never re-trigger it.
+- **Schedule Conflicts** view: the office's to-fix list (flagged jobs, soonest first); rows drop off once fixed. Its BOOLEAN filter value is the string `'true'` — the front end parses boolean filter values with `z.enum(['true','false']).catch(false)`, so a real `true` would silently invert the list.
+
 ## Automation — job completed → Draft Invoice
 
 `src/logic-functions/on-job-completed.ts` runs on every Job update that touches `status` (`job.updated`, `updatedFields: ['status']`). When the status moves **into** Completed (Cancelled never bills; re-saving a completed job does nothing):
@@ -148,7 +164,9 @@ Same mechanics as the estimate handoff (server-verified trigger matching, app to
 
 ## Verification status
 
-**Local (2026-11-17, billing added):** `yarn typecheck`, `yarn test` (65/65), `yarn twenty dev:build` (manifest: estimate/job/invoice objects, invoice relations, views, record page, nav item, both handoff functions with their triggers, function-role writes on Opportunity + Job + Invoice), and `yarn smoke` (4/4 post-install, 6/6 estimate handoff, 6/6 invoice handoff on the built bundles, against mock APIs) all pass. Not yet run against a live Twenty server.
+**Local (2026-11-17, scheduling added):** `yarn typecheck`, `yarn test` (91/91), `yarn twenty dev:build` (manifest: Job `scheduleConflict` / `conflictDetails`, Job Calendar (WEEK, scheduledStart → scheduledEnd), Schedule Conflicts view, `job-schedule-check` on `job.*`), and `yarn smoke` (4/4, 6/6, 6/6, and 6/6 schedule checks on the built bundle against a mock job table) all pass. Not yet run against a live Twenty server.
+
+**Earlier (2026-11-17, billing added):** `yarn typecheck`, `yarn test` (65/65), `yarn twenty dev:build` (manifest: estimate/job/invoice objects, invoice relations, views, record page, nav item, both handoff functions with their triggers, function-role writes on Opportunity + Job + Invoice), and `yarn smoke` (4/4 post-install, 6/6 estimate handoff, 6/6 invoice handoff on the built bundles, against mock APIs) all pass. Not yet run against a live Twenty server.
 
 **Earlier (2026-11-17, estimate-accepted handoff; post-install env fix):** same commands, 44/44 tests.
 
@@ -164,7 +182,7 @@ yarn install
 yarn typecheck               # tsc --noEmit
 yarn test                    # unit tests (vitest)
 yarn twenty dev:build        # build the manifest + function bundles locally
-yarn smoke                   # runtime smoke tests of the BUILT post-install hook and both handoffs
+yarn smoke                   # runtime smoke tests of the BUILT post-install hook, both handoffs and the schedule check
 
 yarn twenty dev                 # sync manifest to a local workspace (hooks don't run in dev)
 yarn twenty dev:function:exec --postInstall   # run Gate A manually during development
@@ -178,6 +196,7 @@ Post-install runs on fresh installs only (`previousVersion === undefined`).
 - **SDK constants are stubbed inside built function bundles** (`stub-twenty-sdk-define.plugin.ts`): any non-`define*` import from `twenty-sdk/define` — including `STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS` — renders as an empty string at runtime. Runtime code (handlers) must use literal UIDs; `lead-labels.test.ts` pins the literal to the real SDK value to catch upstream drift. Manifest code (objects/fields/views) is unaffected.
 - Gate A is source-verified against this repo's server code; the residual risks are server-version drift (the editable-properties list or filter API changing upstream) and the app token being denied the metadata mutation. Both fail safe: the hook logs and the workspace keeps "Opportunity".
 - Standard-field references (`opportunity.fields.name`, `.owner`, `.pointOfContact`) are doc-verified and used in **manifest** code only; any drift fails at manifest build, not runtime.
+- Schedule check: two edits to the same tech's jobs landing at nearly the same moment can each compute from a slightly stale schedule; the next change to that tech's schedule corrects it. A tech with more than 2,000 active jobs is checked on the first 2,000 only (logged).
 - Job-completed invoice handoff: same near-simultaneous caveat as below (Completed → other → Completed within one queue cycle could create two drafts); void the extra one.
 - Estimate-accepted handoff: two near-simultaneous status changes into Accepted for the same estimate could both pass the existing-job check before either job exists, creating two jobs. Unlikely in normal use (it needs Accepted → other → Accepted within one queue cycle); delete the extra job if it happens.
 - View filters are literal values, so "My Leads" is scoped by the Sales Rep role predicate rather than a current-user filter (admins see all).

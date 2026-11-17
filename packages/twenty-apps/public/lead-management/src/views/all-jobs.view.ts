@@ -2,6 +2,8 @@ import { defineView, ViewType } from 'twenty-sdk/define';
 
 import {
   ALL_JOBS_VIEW_UNIVERSAL_IDENTIFIER,
+  JOBS_VIEW_FIELD_SCHEDULE_CONFLICT_UNIVERSAL_IDENTIFIER,
+  JOB_SCHEDULE_CONFLICT_FIELD_UNIVERSAL_IDENTIFIER,
   JOBS_VIEW_FIELD_ASSIGNED_TECH_UNIVERSAL_IDENTIFIER,
   JOBS_VIEW_FIELD_CUSTOMER_UNIVERSAL_IDENTIFIER,
   JOBS_VIEW_FIELD_ESTIMATE_UNIVERSAL_IDENTIFIER,
@@ -80,6 +82,14 @@ export default defineView({
       position: 6,
       isVisible: true,
       size: 200,
+    },
+    {
+      universalIdentifier: JOBS_VIEW_FIELD_SCHEDULE_CONFLICT_UNIVERSAL_IDENTIFIER,
+      fieldMetadataUniversalIdentifier:
+        JOB_SCHEDULE_CONFLICT_FIELD_UNIVERSAL_IDENTIFIER,
+      position: 7,
+      isVisible: true,
+      size: 140,
     },
   ],
 });

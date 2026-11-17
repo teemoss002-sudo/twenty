@@ -1,8 +1,10 @@
 import { defineObject, FieldType } from 'twenty-sdk/define';
 
 import {
+  JOB_CONFLICT_DETAILS_FIELD_UNIVERSAL_IDENTIFIER,
   JOB_NAME_FIELD_UNIVERSAL_IDENTIFIER,
   JOB_OBJECT_UNIVERSAL_IDENTIFIER,
+  JOB_SCHEDULE_CONFLICT_FIELD_UNIVERSAL_IDENTIFIER,
   JOB_SCHEDULED_END_FIELD_UNIVERSAL_IDENTIFIER,
   JOB_SCHEDULED_START_FIELD_UNIVERSAL_IDENTIFIER,
   JOB_SERVICE_TYPE_FIELD_UNIVERSAL_IDENTIFIER,
@@ -187,6 +189,29 @@ export default defineObject({
       description: 'Technician notes from the field.',
       icon: 'IconNotes',
       isNullable: true,
+    },
+    // Set by the schedule check (src/logic-functions/on-job-schedule-changed.ts)
+    // and recomputed on every schedule change, so a hand edit would just be
+    // overwritten: fix the schedule instead.
+    {
+      universalIdentifier: JOB_SCHEDULE_CONFLICT_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.BOOLEAN,
+      name: 'scheduleConflict',
+      label: 'Schedule Conflict',
+      description:
+        'Set automatically when this job overlaps another job for the same tech, or ends before it starts.',
+      icon: 'IconCalendarExclamation',
+      isNullable: false,
+      defaultValue: false,
+    },
+    {
+      universalIdentifier: JOB_CONFLICT_DETAILS_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.TEXT,
+      name: 'conflictDetails',
+      label: 'Conflict Details',
+      description: 'What the schedule check found, e.g. which jobs overlap.',
+      icon: 'IconAlertTriangle',
+      defaultValue: "''",
     },
   ],
 });

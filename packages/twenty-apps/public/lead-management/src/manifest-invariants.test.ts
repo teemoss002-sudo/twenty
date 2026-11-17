@@ -48,6 +48,8 @@ import jobRecordFieldsView from 'src/views/job-record-page-fields.view';
 import allInvoicesView from 'src/views/all-invoices.view';
 import unpaidInvoicesView from 'src/views/unpaid-invoices.view';
 import invoiceRecordFieldsView from 'src/views/invoice-record-page-fields.view';
+import jobCalendarView from 'src/views/job-calendar.view';
+import scheduleConflictsView from 'src/views/schedule-conflicts.view';
 
 import leadsNavItem from 'src/navigation-menu-items/leads.navigation-menu-item';
 import estimatesNavItem from 'src/navigation-menu-items/estimates.navigation-menu-item';
@@ -61,6 +63,12 @@ import salesRepRole from 'src/roles/sales-rep.role';
 import postInstallFunction from 'src/logic-functions/post-install';
 import estimateAcceptedFunction from 'src/logic-functions/on-estimate-accepted';
 import jobCompletedFunction from 'src/logic-functions/on-job-completed';
+import jobScheduleFunction from 'src/logic-functions/on-job-schedule-changed';
+import {
+  JOB_SCHEDULED_END_FIELD_UNIVERSAL_IDENTIFIER,
+  JOB_SCHEDULED_START_FIELD_UNIVERSAL_IDENTIFIER,
+  JOB_SCHEDULE_CONFLICT_FIELD_UNIVERSAL_IDENTIFIER,
+} from 'src/constants/universal-identifiers';
 import { LEAD_RECORD_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER } from 'src/page-layouts/lead.page-layout';
 import { LEAD_STAGE_FIELD_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
@@ -116,6 +124,8 @@ const jobViewFields = [
   ...(allJobsView.config.fields ?? []),
   ...(jobBoardView.config.fields ?? []),
   ...(jobRecordFieldsView.config.fields ?? []),
+  ...(jobCalendarView.config.fields ?? []),
+  ...(scheduleConflictsView.config.fields ?? []),
 ];
 
 const invoiceViewFields = [
@@ -145,6 +155,8 @@ describe('universal identifier uniqueness', () => {
         allInvoicesView,
         unpaidInvoicesView,
         invoiceRecordFieldsView,
+        jobCalendarView,
+        scheduleConflictsView,
       ].map((view) => view.config),
       ...opportunityViewFields,
       ...estimateViewFields,
@@ -152,6 +164,8 @@ describe('universal identifier uniqueness', () => {
       ...invoiceViewFields,
       ...(unpaidInvoicesView.config.filters ?? []),
       ...(unpaidInvoicesView.config.sorts ?? []),
+      ...(scheduleConflictsView.config.filters ?? []),
+      ...(scheduleConflictsView.config.sorts ?? []),
       leadsNavItem.config,
       estimatesNavItem.config,
       jobsNavItem.config,
@@ -163,6 +177,7 @@ describe('universal identifier uniqueness', () => {
       postInstallFunction.config,
       estimateAcceptedFunction.config,
       jobCompletedFunction.config,
+      jobScheduleFunction.config,
     ];
 
     const universalIdentifiers = allEntities.map(
@@ -340,6 +355,27 @@ describe('view wiring', () => {
     expect(
       leadPipelineView.config.mainGroupByFieldMetadataUniversalIdentifier,
     ).toBe(LEAD_STAGE_FIELD_UNIVERSAL_IDENTIFIER);
+  });
+
+  it('the Job Calendar places jobs by scheduled start and end', () => {
+    expect(jobCalendarView.config.type).toBe('CALENDAR');
+    expect(jobCalendarView.config.calendarFieldMetadataUniversalIdentifier).toBe(
+      JOB_SCHEDULED_START_FIELD_UNIVERSAL_IDENTIFIER,
+    );
+    expect(
+      jobCalendarView.config.calendarEndFieldMetadataUniversalIdentifier,
+    ).toBe(JOB_SCHEDULED_END_FIELD_UNIVERSAL_IDENTIFIER);
+  });
+
+  it('Schedule Conflicts lists exactly the flagged jobs (boolean filter value as the string the front end parses)', () => {
+    expect(scheduleConflictsView.config.filters).toEqual([
+      expect.objectContaining({
+        fieldMetadataUniversalIdentifier:
+          JOB_SCHEDULE_CONFLICT_FIELD_UNIVERSAL_IDENTIFIER,
+        operand: 'IS',
+        value: 'true',
+      }),
+    ]);
   });
 
   it('kanban views declare a group-by field', () => {
