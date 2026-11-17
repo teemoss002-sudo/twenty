@@ -58,7 +58,7 @@ export const handler = async (event: EstimateUpdatedEvent): Promise<string> => {
   );
 
   const existingJobId = (
-    existing.jobs as { edges?: Array<{ node?: { id?: string } }> } | undefined
+    existing.serviceJobs as { edges?: Array<{ node?: { id?: string } }> } | undefined
   )?.edges?.[0]?.node?.id;
 
   if (existingJobId) {
@@ -69,7 +69,7 @@ export const handler = async (event: EstimateUpdatedEvent): Promise<string> => {
       CREATE_JOB_MUTATION,
       buildCreateJobVariables(plan),
     );
-    const createdJobId = (created.createJob as { id?: string } | undefined)
+    const createdJobId = (created.createServiceJob as { id?: string } | undefined)
       ?.id;
 
     outcomes.push(`job ${createdJobId ?? '(unknown id)'} created`);

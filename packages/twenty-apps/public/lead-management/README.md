@@ -29,13 +29,14 @@ Invoice (custom object)   → job: MANY_TO_ONE → Job
 
 Estimate status → Accepted  ──(estimate.updated / status)──▶  Lead stage → Won
                                                            ▶  Job created (Scheduled)
-Job status → Completed      ──(job.updated / status)───────▶  Draft Invoice created
+Job status → Completed      ──(serviceJob.updated / status)▶  Draft Invoice created
                                                               (amount + line items from the estimate)
 Any job event (create/delete/restore, or start/end/tech/status change)
-                            ──(job.*)──────────────────────▶  Tech's schedule rechecked:
+                            ──(serviceJob.*)───────────────▶  Tech's schedule rechecked:
                                                               scheduleConflict / conflictDetails flagged or cleared
 ```
 
+- **Job's API name is `serviceJob` / `serviceJobs`** (labels stay "Job" / "Jobs"). `job` / `jobs` are in twenty-shared's `RESERVED_METADATA_NAME_KEYWORDS`, so the server refuses to create an object or field with those names; relation fields pointing at Job are `serviceJob(s)` for the same reason. Found by the first live sync (v2.59.3), where the original `job` object failed with ~169 cascading errors.
 - **No `defineObject()` call exists.** The object keeps `nameSingular: 'opportunity'`; "Lead" is presentation only.
 - Person → Opportunity, Tasks, Notes, Timeline, Attachments, Calendar all reuse the standard object's existing machinery.
 
@@ -58,10 +59,10 @@ Any job event (create/delete/restore, or start/end/tech/status change)
 | `src/logic-functions/lead-labels.test.ts` | Unit tests: Gate A payload & invariants |
 | `src/logic-functions/on-estimate-accepted.ts` | Estimate-accepted handoff: database-event logic function (`estimate.updated`, `status`) |
 | `src/logic-functions/estimate-accepted.ts` | Handoff decision logic, GraphQL documents, payload builders (no SDK runtime imports) |
-| `src/logic-functions/on-job-completed.ts` | Job-completed invoice handoff: database-event logic function (`job.updated`, `status`) |
+| `src/logic-functions/on-job-completed.ts` | Job-completed invoice handoff: database-event logic function (`serviceJob.updated`, `status`) |
 | `src/logic-functions/job-completed.ts` | Invoice handoff decision logic, GraphQL documents, payload builders (no SDK runtime imports) |
 | `src/logic-functions/job-completed.test.ts` | Unit tests: literals pinned to manifests, transition rules, estimate prefill, retry-safe handler flow |
-| `src/logic-functions/on-job-schedule-changed.ts` | Tech double-booking check: database-event logic function (`job.*`) |
+| `src/logic-functions/on-job-schedule-changed.ts` | Tech double-booking check: database-event logic function (`serviceJob.*`) |
 | `src/logic-functions/job-schedule.ts` | Conflict rules (overlap, back-to-back, ends-before-start), event planning, GraphQL documents |
 | `src/logic-functions/job-schedule.test.ts` | Unit tests: literals pinned to manifests, no self-trigger, conflict rules, reassign/complete/delete clearing, paging |
 | `src/logic-functions/workspace-api.ts` | Shared record-API (GraphQL) client for the handoffs |
@@ -110,7 +111,7 @@ Built exactly on the real-estate/partners app conventions:
 
 ## Invoice custom object (billing)
 
-- **Invoice** — `status` SELECT (Draft → Sent → Paid, or Void; default Draft), `amount` CURRENCY, `lineItems` RAW_JSON (same shape as Estimate line items), `issueDate` / `dueDate` / `paidDate` DATE, `job` MANY_TO_ONE → Job (join `jobId`), `customer` MANY_TO_ONE → Person (join `customerId`), with reverse `invoices` on Job and Person.
+- **Invoice** — `status` SELECT (Draft → Sent → Paid, or Void; default Draft), `amount` CURRENCY, `lineItems` RAW_JSON (same shape as Estimate line items), `issueDate` / `dueDate` / `paidDate` DATE, `serviceJob` MANY_TO_ONE → Job (join `serviceJobId`), `customer` MANY_TO_ONE → Person (join `customerId`), with reverse `invoices` on Job and Person.
 - "Overdue" is deliberately **not** a stored status — it is a Sent invoice past its due date, so it can never drift out of sync. The **Unpaid Invoices** view (Draft + Sent, soonest due first) puts overdue ones at the top.
 - Not in this version: online payment (Stripe etc.), invoice PDFs, emailing invoices, review requests after payment.
 
@@ -125,7 +126,7 @@ The manifest **cannot rewrite the options of the core `stage` field** (`defineFi
 1. The linked Lead's `leadStage` is set to `WON` (skipped if the estimate has no lead).
 2. Unless the estimate already has a Job, a Job is created: `name` "Job for <estimate name>", `status` Scheduled, linked to the estimate and its customer. Assigned tech and scheduled times are left for the office to fill in.
 
-**Verified against twenty-server source:** trigger matching is `<objectNameSingular>.<operation>` and `updatedFields` filters update events by `properties.updatedFields`; resolvers are `updateOpportunity(id: UUID!, data: OpportunityUpdateInput!)`, `jobs(filter:)` and `createJob(data: JobCreateInput!)`, with relations written through their join columns (`estimateId`, `customerId`); record inserts require `canUpdateObjectRecords`.
+**Verified against twenty-server source:** trigger matching is `<objectNameSingular>.<operation>` and `updatedFields` filters update events by `properties.updatedFields`; resolvers are `updateOpportunity(id: UUID!, data: OpportunityUpdateInput!)`, `serviceJobs(filter:)` and `createServiceJob(data: ServiceJobCreateInput!)`, with relations written through their join columns (`estimateId`, `customerId`); record inserts require `canUpdateObjectRecords`.
 
 **Permissions:** the handler calls the workspace API with `TWENTY_APP_APPLICATION_ACCESS_TOKEN` (the app's own function role), so it works whoever accepted the estimate — a Sales Rep has no Job access of their own. The function role grants update (which covers create) on Opportunity and Job only, and never delete/destroy.
 
@@ -136,12 +137,12 @@ The manifest **cannot rewrite the options of the core `stage` field** (`defineFi
 - **Job Calendar** (Jobs → views): week calendar of jobs from `scheduledStart` to `scheduledEnd`, showing tech, status, customer and the conflict flag.
 - **Double-booking check** (`src/logic-functions/on-job-schedule-changed.ts`): Twenty apps react to saves and cannot block them, so conflicts are **flagged**, not prevented. Job gains `scheduleConflict` (BOOLEAN) and `conflictDetails` (TEXT, e.g. "Overlaps Job for Roof repair, Job for Furnace and 2 more" or "Ends before it starts"). They are written only by the check — a hand edit would be overwritten on the next schedule change.
 - **Rules:** two active jobs (Scheduled / En Route / In Progress) for the same tech overlap when each starts before the other ends; back-to-back jobs are fine; jobs missing a start or end are not checked; Completed and Cancelled jobs never conflict.
-- **How it runs:** on every job event (`job.*`): creates, deletes, restores, and updates that touch `scheduledStart`, `scheduledEnd`, the assigned tech or `status`. Each run recomputes the full active schedule of every tech involved (old and new tech on a reassignment) and writes only flags that changed. That makes it retry-safe and self-healing: moving, reassigning, completing, cancelling or deleting a job also clears the flags it caused on other jobs. The flag fields are not trigger fields, so the check's own writes never re-trigger it.
+- **How it runs:** on every job event (`serviceJob.*`): creates, deletes, restores, and updates that touch `scheduledStart`, `scheduledEnd`, the assigned tech or `status`. Each run recomputes the full active schedule of every tech involved (old and new tech on a reassignment) and writes only flags that changed. That makes it retry-safe and self-healing: moving, reassigning, completing, cancelling or deleting a job also clears the flags it caused on other jobs. The flag fields are not trigger fields, so the check's own writes never re-trigger it.
 - **Schedule Conflicts** view: the office's to-fix list (flagged jobs, soonest first); rows drop off once fixed. Its BOOLEAN filter value is the string `'true'` — the front end parses boolean filter values with `z.enum(['true','false']).catch(false)`, so a real `true` would silently invert the list.
 
 ## Automation — job completed → Draft Invoice
 
-`src/logic-functions/on-job-completed.ts` runs on every Job update that touches `status` (`job.updated`, `updatedFields: ['status']`). When the status moves **into** Completed (Cancelled never bills; re-saving a completed job does nothing):
+`src/logic-functions/on-job-completed.ts` runs on every Job update that touches `status` (`serviceJob.updated`, `updatedFields: ['status']`). When the status moves **into** Completed (Cancelled never bills; re-saving a completed job does nothing):
 
 1. If the job already has an invoice, nothing is created (retries and re-completes are safe).
 2. Otherwise, when the job has an estimate, its `totalAmount` and `lineItems` are read.
@@ -164,6 +165,8 @@ Same mechanics as the estimate handoff (server-verified trigger matching, app to
 
 ## Verification status
 
+**Live (2026-11-17, Twenty v2.59.3 in a GitHub Codespace via `yarn twenty docker:start`):** `yarn twenty apply` synced all 428 metadata entities with no errors; the post-install relabel ran successfully ("labelSingular=Lead … nameSingular=opportunity (unchanged)"), confirming the `TWENTY_*` env fix; `yarn live-test` passed **9/9**: app objects present, Opportunity labelled "Lead", estimate accepted → lead Won (3s) + exactly one Scheduled job linked to the customer, re-accept → still one job, job completed → one Draft invoice (3s) with the estimate's 1250 USD and line items, overlapping jobs for one tech both flagged (3s) and both cleared after a back-to-back reschedule (3s).
+
 **Local (2026-11-17, scheduling added):** `yarn typecheck`, `yarn test` (91/91), `yarn twenty dev:build` (manifest: Job `scheduleConflict` / `conflictDetails`, Job Calendar (WEEK, scheduledStart → scheduledEnd), Schedule Conflicts view, `job-schedule-check` on `job.*`), and `yarn smoke` (4/4, 6/6, 6/6, and 6/6 schedule checks on the built bundle against a mock job table) all pass. Not yet run against a live Twenty server.
 
 **Earlier (2026-11-17, billing added):** `yarn typecheck`, `yarn test` (65/65), `yarn twenty dev:build` (manifest: estimate/job/invoice objects, invoice relations, views, record page, nav item, both handoff functions with their triggers, function-role writes on Opportunity + Job + Invoice), and `yarn smoke` (4/4 post-install, 6/6 estimate handoff, 6/6 invoice handoff on the built bundles, against mock APIs) all pass. Not yet run against a live Twenty server.
@@ -172,7 +175,7 @@ Same mechanics as the estimate handoff (server-verified trigger matching, app to
 
 **Local (sandbox, 2026-09-12):** `yarn typecheck`, `yarn test` (20/20 — Gate A payload invariants + manifest-layer invariants), `yarn twenty dev:build`, and `yarn smoke` (4/4 on the built post-install bundle) all pass. Manifest build enforces the single-`defineApplicationRole` invariant, so the default function role is pinned at build time.
 
-**Live workspace verification: BLOCKED/DEFERRED (environment limitation).** `yarn twenty dev:function:exec --postInstall` requires a Twenty server at `localhost:2020`; the current sandbox has no server, no Docker, no Postgres/Redis. Run it once a server or remote workspace is available (it is also exercised automatically on first `app:publish` + install). Until then, Gate A behavior is covered end-to-end by `yarn smoke` against a mock metadata API; the real-run risk (workspace rejecting the relabel) fails safe by design — the workspace keeps "Opportunity".
+**Earliest (2026-09-12):** live verification was deferred (no server available); superseded by the live run above.
 
 ## Live testing (real workspace)
 
@@ -181,11 +184,11 @@ Same mechanics as the estimate handoff (server-verified trigger matching, app to
 Setup, against a **test** workspace (the app relabels Opportunity and adds Estimate / Job / Invoice wherever it is synced):
 
 1. `yarn twenty remote:add --url https://<workspace>` — connect the CLI.
-2. `yarn twenty apply`, then `yarn twenty dev:function:exec --postInstall` — sync the app and run the relabel (dev syncs don't run install hooks). Dev-synced apps get a LOCAL application registration, so their database-event functions do fire.
+2. `yarn twenty apply`, then run the relabel (dev syncs don't run install hooks). `yarn twenty dev:function:exec --postInstall` works with an OAuth login; with an **API-key** remote it fails ("Authentication failed"), because `executeOneLogicFunction` requires an authenticated user (`@AuthUser`) — call it through `/metadata` with a user access token instead. Dev-synced apps get a LOCAL application registration, so their database-event functions do fire.
 3. Create `.env.live` (gitignored) with `TWENTY_LIVE_URL=` and `TWENTY_LIVE_API_KEY=` (Settings → APIs & Webhooks).
 4. `yarn live-test` — test records are labelled "JobFlow live test …" and moved to the trash afterwards (`--keep` leaves them for inspection). Schedule test jobs are booked in January 2099 so they cannot collide with real bookings.
 
-Not yet run: no live workspace has been connected from the development machine so far.
+Last run: 2026-11-17, 9/9 on Twenty v2.59.3 (see Verification status). A local dev server (`yarn twenty docker:start`, login `tim@apple.dev` / `tim@apple.dev`) works well for this; it needs Docker and a few GB of RAM.
 
 ## Install / dev
 

@@ -194,7 +194,7 @@ describe('standard object safety', () => {
     // The build enforces one defineObject per file; this asserts no new custom
     // object was accidentally introduced to "replace" the standard one.
     expect(estimateObject.config.nameSingular).toBe('estimate');
-    expect(jobObject.config.nameSingular).toBe('job');
+    expect(jobObject.config.nameSingular).toBe('serviceJob');
     expect(invoiceObject.config.nameSingular).toBe('invoice');
   });
 

@@ -19,7 +19,7 @@ export default defineField({
   objectUniversalIdentifier:
     STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.workspaceMember.universalIdentifier,
   type: FieldType.RELATION,
-  name: 'jobs',
+  name: 'serviceJobs',
   label: 'Jobs',
   icon: 'IconTool',
   relationTargetObjectMetadataUniversalIdentifier:

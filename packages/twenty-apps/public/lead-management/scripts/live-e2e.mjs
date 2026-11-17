@@ -146,8 +146,8 @@ try {
 
   record(
     'app synced: Estimate, Job and Invoice objects exist',
-    Boolean(byName.estimate && byName.job && byName.invoice),
-    ['estimate', 'job', 'invoice'].filter((name) => !byName[name]).join(', ') || '',
+    Boolean(byName.estimate && byName.serviceJob && byName.invoice),
+    ['estimate', 'serviceJob', 'invoice'].filter((name) => !byName[name]).join(', ') || '',
   );
   record(
     'rename: Opportunity is labelled "Lead"',
@@ -179,10 +179,10 @@ try {
   const findJobs = async () =>
     (
       await gql(
-        `query ($id: UUID!) { jobs(filter: { estimateId: { eq: $id } }) { edges { node { id name status customerId } } } }`,
+        `query ($id: UUID!) { serviceJobs(filter: { estimateId: { eq: $id } }) { edges { node { id name status customerId } } } }`,
         { id: estimateId },
       )
-    ).jobs.edges.map((edge) => edge.node);
+    ).serviceJobs.edges.map((edge) => edge.node);
 
   const handoff = await poll('estimate handoff', async () => {
     const lead = (
@@ -196,7 +196,7 @@ try {
   });
 
   for (const job of handoff.jobs ?? []) {
-    remember('job', job.id);
+    remember('serviceJob', job.id);
   }
 
   record(
@@ -225,7 +225,7 @@ try {
 
   for (const job of jobsAfterReaccept) {
     if (!created.some((entry) => entry.id === job.id)) {
-      remember('job', job.id);
+      remember('serviceJob', job.id);
     }
   }
 
@@ -237,12 +237,12 @@ try {
 
   // 3. Job completed → Draft invoice prefilled from the estimate.
   if (handoffJob) {
-    await update('job', handoffJob.id, { status: 'COMPLETED' });
+    await update('serviceJob', handoffJob.id, { status: 'COMPLETED' });
 
     const billing = await poll('invoice handoff', async () => {
       const invoices = (
         await gql(
-          `query ($id: UUID!) { invoices(filter: { jobId: { eq: $id } }) { edges { node { id name status amount { amountMicros currencyCode } lineItems } } } }`,
+          `query ($id: UUID!) { invoices(filter: { serviceJobId: { eq: $id } }) { edges { node { id name status amount { amountMicros currencyCode } lineItems } } } }`,
           { id: handoffJob.id },
         )
       ).invoices.edges.map((edge) => edge.node);
@@ -283,14 +283,14 @@ try {
   if (!tech) {
     record('schedule: double-booking flagged', false, 'no workspace member to assign');
   } else {
-    const jobA = await create('job', {
+    const jobA = await create('serviceJob', {
       name: `${RUN} job A`,
       status: 'SCHEDULED',
       assignedTechId: tech.id,
       scheduledStart: SLOT(9),
       scheduledEnd: SLOT(11),
     });
-    const jobB = await create('job', {
+    const jobB = await create('serviceJob', {
       name: `${RUN} job B`,
       status: 'SCHEDULED',
       assignedTechId: tech.id,
@@ -302,10 +302,10 @@ try {
       Object.fromEntries(
         (
           await gql(
-            `query ($ids: [UUID!]) { jobs(filter: { id: { in: $ids } }) { edges { node { id scheduleConflict conflictDetails } } } }`,
+            `query ($ids: [UUID!]) { serviceJobs(filter: { id: { in: $ids } }) { edges { node { id scheduleConflict conflictDetails } } } }`,
             { ids: [jobA, jobB] },
           )
-        ).jobs.edges.map((edge) => [edge.node.id, edge.node]),
+        ).serviceJobs.edges.map((edge) => [edge.node.id, edge.node]),
       );
 
     const flagged = await poll('schedule flag', async () => {
@@ -324,7 +324,7 @@ try {
         : '',
     );
 
-    await update('job', jobB, { scheduledStart: SLOT(11) });
+    await update('serviceJob', jobB, { scheduledStart: SLOT(11) });
 
     const cleared = await poll('schedule clear', async () => {
       const flags = await readFlags();

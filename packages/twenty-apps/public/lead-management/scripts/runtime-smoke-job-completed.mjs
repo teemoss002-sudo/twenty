@@ -90,7 +90,7 @@ const record = (name, ok, detail = '') => {
 };
 
 const completedEvent = (beforeStatus = 'IN_PROGRESS') => ({
-  name: 'job.updated',
+  name: 'serviceJob.updated',
   workspaceId: 'workspace-1',
   recordId: 'job-1',
   properties: {
@@ -148,13 +148,13 @@ try {
     (call) => call.query.match(/(invoices|estimate|createInvoice)\(/)?.[1],
   );
   assert.deepEqual(operations, ['invoices', 'estimate', 'createInvoice']);
-  assert.deepEqual(receivedCalls[0].variables, { jobId: 'job-1' });
+  assert.deepEqual(receivedCalls[0].variables, { serviceJobId: 'job-1' });
   assert.deepEqual(receivedCalls[1].variables, { estimateId: 'estimate-1' });
   assert.deepEqual(receivedCalls[2].variables, {
     data: {
       name: 'Invoice for Kitchen rewire',
       status: 'DRAFT',
-      jobId: 'job-1',
+      serviceJobId: 'job-1',
       customerId: 'person-1',
       amount: { amountMicros: 1250000000, currencyCode: 'USD' },
       lineItems: ESTIMATE.lineItems,

@@ -7,7 +7,7 @@
 // runtime:
 //   1. env injection: TWENTY_API_URL + the application token, sent as Bearer
 //   2. accepted transition: lead marked Won, existing-job lookup, job created
-//   3. retry / re-accept: an existing job means no second createJob
+//   3. retry / re-accept: an existing job means no second createServiceJob
 //   4. non-transition (already Accepted): no API calls at all
 //   5. API errors propagate (the server re-queues the run)
 //
@@ -57,11 +57,11 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    if (call.query.includes('jobs(filter:')) {
+    if (call.query.includes('serviceJobs(filter:')) {
       res.end(
         JSON.stringify({
           data: {
-            jobs: {
+            serviceJobs: {
               edges: existingJobId ? [{ node: { id: existingJobId } }] : [],
             },
           },
@@ -70,10 +70,10 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    if (call.query.includes('createJob(')) {
+    if (call.query.includes('createServiceJob(')) {
       res.end(
         JSON.stringify({
-          data: { createJob: { id: 'job-created-1', name: call.variables.data.name } },
+          data: { createServiceJob: { id: 'job-created-1', name: call.variables.data.name } },
         }),
       );
       return;
@@ -142,9 +142,9 @@ try {
   receivedCalls = [];
   const summary = await handler(acceptedEvent());
   const operations = receivedCalls.map(
-    (call) => call.query.match(/(updateOpportunity|jobs|createJob)\(/)?.[1],
+    (call) => call.query.match(/(updateOpportunity|serviceJobs|createServiceJob)\(/)?.[1],
   );
-  assert.deepEqual(operations, ['updateOpportunity', 'jobs', 'createJob']);
+  assert.deepEqual(operations, ['updateOpportunity', 'serviceJobs', 'createServiceJob']);
   assert.deepEqual(receivedCalls[0].variables, {
     id: 'lead-1',
     data: { leadStage: 'WON' },
@@ -169,8 +169,8 @@ try {
   existingJobId = 'job-existing-1';
   const retrySummary = await handler(acceptedEvent());
   record(
-    'retry: existing job is reused, no second createJob',
-    !receivedCalls.some((call) => call.query.includes('createJob(')) &&
+    'retry: existing job is reused, no second createServiceJob',
+    !receivedCalls.some((call) => call.query.includes('createServiceJob(')) &&
       retrySummary.includes('already exists'),
     retrySummary,
   );

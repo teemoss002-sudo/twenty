@@ -49,7 +49,7 @@ const fetchActiveJobsForTech = async (
       FIND_ACTIVE_JOBS_FOR_TECH_QUERY,
       buildFindActiveJobsVariables(techId, after),
     );
-    const connection = data.jobs as JobsPage | undefined;
+    const connection = data.serviceJobs as JobsPage | undefined;
 
     for (const edge of connection?.edges ?? []) {
       if (edge.node?.id) {
@@ -111,11 +111,11 @@ export const handler = async (event: JobScheduleEvent): Promise<string> => {
     }
   }
 
-  for (const [jobId, desired] of updates) {
+  for (const [serviceJobId, desired] of updates) {
     await requestWorkspaceApi(
       access,
       UPDATE_JOB_CONFLICT_MUTATION,
-      buildUpdateJobConflictVariables(jobId, desired),
+      buildUpdateJobConflictVariables(serviceJobId, desired),
     );
   }
 

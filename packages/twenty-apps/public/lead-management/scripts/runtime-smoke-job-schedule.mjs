@@ -47,7 +47,7 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    if (call.query.includes('jobs(')) {
+    if (call.query.includes('serviceJobs(')) {
       assert.ok(call.query.includes('status: { in: [SCHEDULED, EN_ROUTE, IN_PROGRESS] }'));
       const nodes = Object.values(jobs).filter(
         (job) => job.assignedTechId === call.variables.techId && ACTIVE.includes(job.status),
@@ -55,7 +55,7 @@ const server = http.createServer((req, res) => {
       res.end(
         JSON.stringify({
           data: {
-            jobs: {
+            serviceJobs: {
               edges: nodes.map(({ assignedTechId, ...node }) => ({ node })),
               pageInfo: { hasNextPage: false, endCursor: null },
             },
@@ -65,9 +65,9 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    if (call.query.includes('updateJob(')) {
+    if (call.query.includes('updateServiceJob(')) {
       Object.assign(jobs[call.variables.id], call.variables.data);
-      res.end(JSON.stringify({ data: { updateJob: { id: call.variables.id } } }));
+      res.end(JSON.stringify({ data: { updateServiceJob: { id: call.variables.id } } }));
       return;
     }
 
@@ -94,13 +94,13 @@ const makeJob = (id, techId, start, end) => ({
 });
 
 const updatedEvent = (id, before = {}) => ({
-  name: 'job.updated',
+  name: 'serviceJob.updated',
   workspaceId: 'workspace-1',
   recordId: id,
   properties: { updatedFields: ['scheduledStart'], before, after: { ...jobs[id] } },
 });
 
-const writes = () => receivedCalls.filter((call) => call.query.includes('updateJob('));
+const writes = () => receivedCalls.filter((call) => call.query.includes('updateServiceJob('));
 
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;

@@ -18,7 +18,7 @@ export default defineField({
   objectUniversalIdentifier:
     STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.person.universalIdentifier,
   type: FieldType.RELATION,
-  name: 'jobs',
+  name: 'serviceJobs',
   label: 'Jobs',
   icon: 'IconTool',
   relationTargetObjectMetadataUniversalIdentifier:

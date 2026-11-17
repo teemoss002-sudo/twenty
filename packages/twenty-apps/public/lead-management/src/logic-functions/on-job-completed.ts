@@ -40,7 +40,7 @@ export const handler = async (event: JobUpdatedEvent): Promise<string> => {
   const existing = await requestWorkspaceApi(
     access,
     FIND_INVOICES_FOR_JOB_QUERY,
-    buildFindInvoicesForJobVariables(plan.jobId),
+    buildFindInvoicesForJobVariables(plan.serviceJobId),
   );
 
   const existingInvoiceId = (
@@ -50,7 +50,7 @@ export const handler = async (event: JobUpdatedEvent): Promise<string> => {
   )?.edges?.[0]?.node?.id;
 
   if (existingInvoiceId) {
-    const summary = `[JobFlow] job ${plan.jobId} completed: invoice ${existingInvoiceId} already exists, none created`;
+    const summary = `[JobFlow] job ${plan.serviceJobId} completed: invoice ${existingInvoiceId} already exists, none created`;
 
     console.log(summary);
 
@@ -80,7 +80,7 @@ export const handler = async (event: JobUpdatedEvent): Promise<string> => {
   const source = estimate
     ? `prefilled from estimate ${plan.estimateId}`
     : 'no estimate to prefill from';
-  const summary = `[JobFlow] job ${plan.jobId} completed: draft invoice ${createdInvoiceId ?? '(unknown id)'} created (${source})`;
+  const summary = `[JobFlow] job ${plan.serviceJobId} completed: draft invoice ${createdInvoiceId ?? '(unknown id)'} created (${source})`;
 
   console.log(summary);
 

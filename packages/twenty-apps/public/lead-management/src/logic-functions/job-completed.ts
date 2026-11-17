@@ -20,7 +20,7 @@
  * job-completed.test.ts.
  */
 
-export const JOB_UPDATED_EVENT_NAME = 'job.updated';
+export const JOB_UPDATED_EVENT_NAME = 'serviceJob.updated';
 export const JOB_STATUS_FIELD_NAME = 'status';
 
 // Select-option values (pinned to the manifests by job-completed.test.ts).
@@ -49,7 +49,7 @@ export type InvoiceHandoffPlan =
   | { kind: 'skip'; reason: string }
   | {
       kind: 'invoice';
-      jobId: string;
+      serviceJobId: string;
       estimateId: string | null;
       customerId: string | null;
       invoiceName: string;
@@ -76,7 +76,7 @@ export const buildInvoiceName = (jobName?: string | null): string => {
 };
 
 /**
- * Decide what to do with one `job.updated` event. Only a transition INTO
+ * Decide what to do with one `serviceJob.updated` event. Only a transition INTO
  * Completed bills; re-saving a completed job does nothing.
  */
 export const planInvoiceHandoff = (
@@ -96,15 +96,15 @@ export const planInvoiceHandoff = (
     };
   }
 
-  const jobId = event.recordId ?? after.id ?? null;
+  const serviceJobId = event.recordId ?? after.id ?? null;
 
-  if (!jobId) {
+  if (!serviceJobId) {
     return { kind: 'skip', reason: 'event carries no job id' };
   }
 
   return {
     kind: 'invoice',
-    jobId,
+    serviceJobId,
     estimateId: after.estimateId ?? null,
     customerId: after.customerId ?? null,
     invoiceName: buildInvoiceName(after.name),
@@ -115,8 +115,8 @@ export const planInvoiceHandoff = (
 // Workspace GraphQL documents (POST {TWENTY_API_URL}/graphql).
 // -----------------------------------------------------------------------------
 
-export const FIND_INVOICES_FOR_JOB_QUERY = `query JobFlowFindInvoicesForJob($jobId: UUID!) {
-  invoices(filter: { jobId: { eq: $jobId } }, first: 1) { edges { node { id } } }
+export const FIND_INVOICES_FOR_JOB_QUERY = `query JobFlowFindInvoicesForJob($serviceJobId: UUID!) {
+  invoices(filter: { serviceJobId: { eq: $serviceJobId } }, first: 1) { edges { node { id } } }
 }`;
 
 export const FIND_ESTIMATE_BILLING_QUERY = `query JobFlowFindEstimateBilling($estimateId: UUID!) {
@@ -127,7 +127,7 @@ export const CREATE_INVOICE_MUTATION = `mutation JobFlowCreateInvoiceFromJob($da
   createInvoice(data: $data) { id name }
 }`;
 
-export const buildFindInvoicesForJobVariables = (jobId: string) => ({ jobId });
+export const buildFindInvoicesForJobVariables = (serviceJobId: string) => ({ serviceJobId });
 
 export const buildFindEstimateBillingVariables = (estimateId: string) => ({
   estimateId,
@@ -147,7 +147,7 @@ export const buildCreateInvoiceVariables = (
   data: {
     name: plan.invoiceName,
     status: INVOICE_STATUS_DRAFT,
-    jobId: plan.jobId,
+    serviceJobId: plan.serviceJobId,
     ...(plan.customerId ? { customerId: plan.customerId } : {}),
     ...(hasAmount(estimate?.totalAmount)
       ? {

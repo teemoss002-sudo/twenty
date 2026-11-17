@@ -14,7 +14,7 @@
  * deleting a job clears the flags it caused on other jobs too.
  *
  * Server-verified (twenty-server source):
- *  - `job.*` matches every job event (`<object>.*` in the trigger matcher);
+ *  - `serviceJob.*` matches every job event (`<object>.*` in the trigger matcher);
  *    `updatedFields` filters only `updated` events, so created / deleted /
  *    destroyed / restored events always run the check.
  *  - `properties.updatedFields` are the changed keys of the flat record
@@ -29,7 +29,7 @@
  * job-schedule.test.ts.
  */
 
-export const JOB_ALL_EVENTS_NAME = 'job.*';
+export const JOB_ALL_EVENTS_NAME = 'serviceJob.*';
 
 // Changes that can create or clear a double-booking. `assignedTech` is listed
 // alongside its join column in case a server reports the relation name.
@@ -221,15 +221,15 @@ export const planScheduleCheck = (event: JobScheduleEvent): ScheduleCheckPlan =>
     eventName.endsWith('.destroyed') ||
     Boolean(after?.deletedAt) ||
     !after;
-  const jobId = event.recordId ?? after?.id ?? null;
+  const serviceJobId = event.recordId ?? after?.id ?? null;
 
   return {
     techIds,
     triggerJob:
-      isGone || !jobId || !after
+      isGone || !serviceJobId || !after
         ? null
         : {
-            id: jobId,
+            id: serviceJobId,
             name: after.name ?? null,
             status: after.status ?? null,
             scheduledStart: after.scheduledStart ?? null,
@@ -246,7 +246,7 @@ export const planScheduleCheck = (event: JobScheduleEvent): ScheduleCheckPlan =>
 // -----------------------------------------------------------------------------
 
 export const FIND_ACTIVE_JOBS_FOR_TECH_QUERY = `query JobFlowFindActiveJobsForTech($techId: UUID!, $after: String) {
-  jobs(
+  serviceJobs(
     filter: { and: [{ assignedTechId: { eq: $techId } }, { status: { in: [${ACTIVE_JOB_STATUSES.join(', ')}] } }] }
     first: ${JOBS_PAGE_SIZE}
     after: $after
@@ -256,8 +256,8 @@ export const FIND_ACTIVE_JOBS_FOR_TECH_QUERY = `query JobFlowFindActiveJobsForTe
   }
 }`;
 
-export const UPDATE_JOB_CONFLICT_MUTATION = `mutation JobFlowSetJobConflict($id: UUID!, $data: JobUpdateInput!) {
-  updateJob(id: $id, data: $data) { id scheduleConflict conflictDetails }
+export const UPDATE_JOB_CONFLICT_MUTATION = `mutation JobFlowSetJobConflict($id: UUID!, $data: ServiceJobUpdateInput!) {
+  updateServiceJob(id: $id, data: $data) { id scheduleConflict conflictDetails }
 }`;
 
 export const buildFindActiveJobsVariables = (
@@ -266,10 +266,10 @@ export const buildFindActiveJobsVariables = (
 ) => ({ techId, after });
 
 export const buildUpdateJobConflictVariables = (
-  jobId: string,
+  serviceJobId: string,
   desired: ConflictState,
 ) => ({
-  id: jobId,
+  id: serviceJobId,
   data: {
     scheduleConflict: desired.scheduleConflict,
     conflictDetails: desired.conflictDetails,

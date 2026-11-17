@@ -83,7 +83,7 @@ const completedEvent = (
 
 const invoicePlan = {
   kind: 'invoice' as const,
-  jobId: 'job-1',
+  serviceJobId: 'job-1',
   estimateId: 'estimate-1',
   customerId: 'person-1',
   invoiceName: 'Invoice for Kitchen rewire',
@@ -116,7 +116,7 @@ describe('runtime literals match the manifest', () => {
     expect(Object.keys(data)).toContain(joinColumnOf(invoiceJobField));
     expect(Object.keys(data)).toContain(joinColumnOf(invoiceCustomerField));
     expect(FIND_INVOICES_FOR_JOB_QUERY).toContain(
-      `${joinColumnOf(invoiceJobField)}: { eq: $jobId }`,
+      `${joinColumnOf(invoiceJobField)}: { eq: $serviceJobId }`,
     );
   });
 
@@ -167,7 +167,7 @@ describe('planInvoiceHandoff', () => {
 
     expect(planInvoiceHandoff(withoutRecordId)).toMatchObject({
       kind: 'invoice',
-      jobId: 'job-1',
+      serviceJobId: 'job-1',
     });
 
     withoutRecordId.properties!.after!.id = null;
@@ -197,7 +197,7 @@ describe('draft invoice payload', () => {
       data: {
         name: 'Invoice for Kitchen rewire',
         status: INVOICE_STATUS_DRAFT,
-        jobId: 'job-1',
+        serviceJobId: 'job-1',
         customerId: 'person-1',
         amount: { amountMicros: 1250000000, currencyCode: 'USD' },
         lineItems: ESTIMATE.lineItems,
@@ -222,7 +222,7 @@ describe('draft invoice payload', () => {
     expect(data).toEqual({
       name: 'Invoice for Kitchen rewire',
       status: INVOICE_STATUS_DRAFT,
-      jobId: 'job-1',
+      serviceJobId: 'job-1',
     });
   });
 

@@ -125,8 +125,8 @@ describe('runtime literals match the manifest', () => {
   it('targets the resolvers generated for the opportunity and job objects', () => {
     expect(MARK_LEAD_WON_MUTATION).toContain('updateOpportunity(id: $id');
     expect(MARK_LEAD_WON_MUTATION).toContain('OpportunityUpdateInput!');
-    expect(CREATE_JOB_MUTATION).toContain('createJob(data: $data)');
-    expect(CREATE_JOB_MUTATION).toContain('JobCreateInput!');
+    expect(CREATE_JOB_MUTATION).toContain('createServiceJob(data: $data)');
+    expect(CREATE_JOB_MUTATION).toContain('ServiceJobCreateInput!');
     expect(FIND_JOBS_FOR_ESTIMATE_QUERY).toContain(
       `${jobObject.config.namePlural}(filter:`,
     );
@@ -249,13 +249,13 @@ describe('handler (mock workspace API)', () => {
 
         const data = call.query.includes('updateOpportunity')
           ? { updateOpportunity: { id: 'lead-1', leadStage: LEAD_STAGE_WON } }
-          : call.query.includes('jobs(filter')
+          : call.query.includes('serviceJobs(filter')
             ? {
-                jobs: {
+                serviceJobs: {
                   edges: existingJobId ? [{ node: { id: existingJobId } }] : [],
                 },
               }
-            : { createJob: { id: 'job-new', name: 'Job' } };
+            : { createServiceJob: { id: 'job-new', name: 'Job' } };
 
         return new Response(JSON.stringify({ data }), { status: 200 });
       }),
@@ -271,10 +271,10 @@ describe('handler (mock workspace API)', () => {
   it('marks the lead Won, then creates the job', async () => {
     const summary = await handler(acceptedEvent());
 
-    expect(calls.map((call) => call.query.match(/(updateOpportunity|jobs|createJob)\(/)?.[1])).toEqual([
+    expect(calls.map((call) => call.query.match(/(updateOpportunity|serviceJobs|createServiceJob)\(/)?.[1])).toEqual([
       'updateOpportunity',
-      'jobs',
-      'createJob',
+      'serviceJobs',
+      'createServiceJob',
     ]);
     expect(calls[0].variables).toEqual(buildMarkLeadWonVariables('lead-1'));
     expect(calls[2].variables).toMatchObject({
@@ -288,7 +288,7 @@ describe('handler (mock workspace API)', () => {
 
     const summary = await handler(acceptedEvent());
 
-    expect(calls.some((call) => call.query.includes('createJob('))).toBe(false);
+    expect(calls.some((call) => call.query.includes('createServiceJob('))).toBe(false);
     expect(calls[0].query).toContain('updateOpportunity');
     expect(summary).toContain('job job-existing already exists');
   });
@@ -297,7 +297,7 @@ describe('handler (mock workspace API)', () => {
     await handler(acceptedEvent({ leadId: null }));
 
     expect(calls.some((call) => call.query.includes('updateOpportunity'))).toBe(false);
-    expect(calls.some((call) => call.query.includes('createJob('))).toBe(true);
+    expect(calls.some((call) => call.query.includes('createServiceJob('))).toBe(true);
   });
 
   it('makes no API calls when the update is not a move into Accepted', async () => {

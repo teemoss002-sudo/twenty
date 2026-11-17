@@ -39,10 +39,16 @@ enum ServiceType {
 // migrations). Relation fields (estimate, customer, assignedTech) are declared
 // in src/fields/job/*.field.ts — following the real-estate app convention of
 // keeping relations out of defineObject's inline field list.
+//
+// The API name is `serviceJob` / `serviceJobs`, not `job` / `jobs`: those are
+// in twenty-shared's RESERVED_METADATA_NAME_KEYWORDS, and the server refuses
+// to create the object (found by the live test on Twenty v2.59.3). Labels stay
+// "Job" / "Jobs", so nothing changes for people using the app; relation fields
+// pointing at it are named `serviceJob(s)` for the same reason.
 export default defineObject({
   universalIdentifier: JOB_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'job',
-  namePlural: 'jobs',
+  nameSingular: 'serviceJob',
+  namePlural: 'serviceJobs',
   labelSingular: 'Job',
   labelPlural: 'Jobs',
   description: 'A piece of scheduled work performed for a customer.',

@@ -17,7 +17,7 @@
  *    must be idempotent: the lead update is idempotent by nature, and job
  *    creation is guarded by an existing-job lookup on `estimateId`.
  *  - Workspace GraphQL names (get-resolver-name.util.ts, input-type
- *    generators): findMany `jobs`, createOne `createJob(data: JobCreateInput!)`,
+ *    generators): findMany `serviceJobs`, createOne `createServiceJob(data: ServiceJobCreateInput!)`,
  *    updateOne `updateOpportunity(id: UUID!, data: OpportunityUpdateInput!)`.
  *    MANY_TO_ONE relations are written through their join column
  *    (`estimateId`, `customerId`).
@@ -125,11 +125,11 @@ export const MARK_LEAD_WON_MUTATION = `mutation JobFlowMarkLeadWon($id: UUID!, $
 }`;
 
 export const FIND_JOBS_FOR_ESTIMATE_QUERY = `query JobFlowFindJobsForEstimate($estimateId: UUID!) {
-  jobs(filter: { estimateId: { eq: $estimateId } }, first: 1) { edges { node { id } } }
+  serviceJobs(filter: { estimateId: { eq: $estimateId } }, first: 1) { edges { node { id } } }
 }`;
 
-export const CREATE_JOB_MUTATION = `mutation JobFlowCreateJobFromEstimate($data: JobCreateInput!) {
-  createJob(data: $data) { id name }
+export const CREATE_JOB_MUTATION = `mutation JobFlowCreateJobFromEstimate($data: ServiceJobCreateInput!) {
+  createServiceJob(data: $data) { id name }
 }`;
 
 export const buildMarkLeadWonVariables = (leadId: string) => ({

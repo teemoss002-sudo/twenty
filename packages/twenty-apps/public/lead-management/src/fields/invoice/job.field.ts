@@ -18,7 +18,7 @@ export default defineField({
   universalIdentifier: INVOICE_JOB_FIELD_UNIVERSAL_IDENTIFIER,
   objectUniversalIdentifier: INVOICE_OBJECT_UNIVERSAL_IDENTIFIER,
   type: FieldType.RELATION,
-  name: 'job',
+  name: 'serviceJob',
   label: 'Job',
   icon: 'IconTool',
   isNullable: true,
@@ -29,6 +29,6 @@ export default defineField({
   universalSettings: {
     relationType: RelationType.MANY_TO_ONE,
     onDelete: OnDeleteAction.SET_NULL,
-    joinColumnName: 'jobId',
+    joinColumnName: 'serviceJobId',
   },
 });

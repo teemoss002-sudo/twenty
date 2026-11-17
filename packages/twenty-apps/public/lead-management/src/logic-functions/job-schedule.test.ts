@@ -109,8 +109,8 @@ describe('runtime literals match the manifest', () => {
     expect(FIND_ACTIVE_JOBS_FOR_TECH_QUERY).toContain(
       'status: { in: [SCHEDULED, EN_ROUTE, IN_PROGRESS] }',
     );
-    expect(UPDATE_JOB_CONFLICT_MUTATION).toContain('updateJob(id: $id, data: $data)');
-    expect(UPDATE_JOB_CONFLICT_MUTATION).toContain('JobUpdateInput!');
+    expect(UPDATE_JOB_CONFLICT_MUTATION).toContain('updateServiceJob(id: $id, data: $data)');
+    expect(UPDATE_JOB_CONFLICT_MUTATION).toContain('ServiceJobUpdateInput!');
   });
 });
 
@@ -208,7 +208,7 @@ describe('evaluateStandaloneJob', () => {
 describe('planScheduleCheck', () => {
   it('checks both the old and new tech when a job is reassigned', () => {
     const plan = planScheduleCheck({
-      name: 'job.updated',
+      name: 'serviceJob.updated',
       recordId: 'a',
       properties: {
         before: { assignedTechId: 'tech-1' },
@@ -222,7 +222,7 @@ describe('planScheduleCheck', () => {
 
   it('rechecks the tech but not the job itself when a job is deleted or destroyed', () => {
     const deleted = planScheduleCheck({
-      name: 'job.deleted',
+      name: 'serviceJob.deleted',
       recordId: 'a',
       properties: {
         before: { assignedTechId: 'tech-1' },
@@ -230,7 +230,7 @@ describe('planScheduleCheck', () => {
       },
     });
     const destroyed = planScheduleCheck({
-      name: 'job.destroyed',
+      name: 'serviceJob.destroyed',
       recordId: 'a',
       properties: { before: { assignedTechId: 'tech-1' } },
     });
@@ -242,7 +242,7 @@ describe('planScheduleCheck', () => {
   it('handles a newly created job with no tech', () => {
     expect(
       planScheduleCheck({
-        name: 'job.created',
+        name: 'serviceJob.created',
         recordId: 'a',
         properties: { after: { id: 'a', status: 'SCHEDULED' } },
       }),
@@ -258,14 +258,14 @@ describe('handler (mock workspace API)', () => {
 
   const updatesSent = () =>
     calls
-      .filter((call) => call.query.includes('updateJob('))
+      .filter((call) => call.query.includes('updateServiceJob('))
       .map((call) => call.variables as { id: string; data: Record<string, unknown> });
 
   const updatedEvent = (
     after: Record<string, unknown>,
     before: Record<string, unknown> = {},
   ): JobScheduleEvent => ({
-    name: 'job.updated',
+    name: 'serviceJob.updated',
     recordId: after.id as string,
     properties: { before, after },
   });
@@ -283,9 +283,9 @@ describe('handler (mock workspace API)', () => {
 
         calls.push(call);
 
-        if (call.query.includes('updateJob(')) {
+        if (call.query.includes('updateServiceJob(')) {
           return new Response(
-            JSON.stringify({ data: { updateJob: { id: call.variables.id } } }),
+            JSON.stringify({ data: { updateServiceJob: { id: call.variables.id } } }),
             { status: 200 },
           );
         }
@@ -297,7 +297,7 @@ describe('handler (mock workspace API)', () => {
         return new Response(
           JSON.stringify({
             data: {
-              jobs: {
+              serviceJobs: {
                 edges: (pages[pageIndex] ?? []).map((node) => ({ node })),
                 pageInfo: {
                   hasNextPage,
@@ -366,7 +366,7 @@ describe('handler (mock workspace API)', () => {
       ),
     );
 
-    expect(calls.filter((call) => call.query.includes('jobs(')).map((call) => call.variables.techId)).toEqual([
+    expect(calls.filter((call) => call.query.includes('serviceJobs(')).map((call) => call.variables.techId)).toEqual([
       'tech-2',
       'tech-1',
     ]);
@@ -403,7 +403,7 @@ describe('handler (mock workspace API)', () => {
 
   it('makes no API calls for a new job with no tech and no flag', async () => {
     const summary = await handler({
-      name: 'job.created',
+      name: 'serviceJob.created',
       recordId: 'a',
       properties: { after: { id: 'a', status: 'SCHEDULED', scheduleConflict: false } },
     });
@@ -417,7 +417,7 @@ describe('handler (mock workspace API)', () => {
 
     await handler(updatedEvent({ id: 'a', assignedTechId: 'tech-1', status: 'SCHEDULED' }));
 
-    expect(calls.filter((call) => call.query.includes('jobs(')).map((call) => call.variables.after)).toEqual([
+    expect(calls.filter((call) => call.query.includes('serviceJobs(')).map((call) => call.variables.after)).toEqual([
       null,
       '1',
     ]);
