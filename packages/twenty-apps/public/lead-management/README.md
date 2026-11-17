@@ -23,9 +23,14 @@ custom object             → customer: MANY_TO_ONE → Person
 Job (custom object)       → estimate: MANY_TO_ONE → Estimate
                           → customer: MANY_TO_ONE → Person
                           → assignedTech: MANY_TO_ONE → WorkspaceMember
+        ↓ invoices (ONE_TO_MANY reverse field)
+Invoice (custom object)   → job: MANY_TO_ONE → Job
+                          → customer: MANY_TO_ONE → Person
 
 Estimate status → Accepted  ──(estimate.updated / status)──▶  Lead stage → Won
                                                            ▶  Job created (Scheduled)
+Job status → Completed      ──(job.updated / status)───────▶  Draft Invoice created
+                                                              (amount + line items from the estimate)
 ```
 
 - **No `defineObject()` call exists.** The object keeps `nameSingular: 'opportunity'`; "Lead" is presentation only.
@@ -50,6 +55,10 @@ Estimate status → Accepted  ──(estimate.updated / status)──▶  Lead s
 | `src/logic-functions/lead-labels.test.ts` | Unit tests: Gate A payload & invariants |
 | `src/logic-functions/on-estimate-accepted.ts` | Estimate-accepted handoff: database-event logic function (`estimate.updated`, `status`) |
 | `src/logic-functions/estimate-accepted.ts` | Handoff decision logic, GraphQL documents, payload builders (no SDK runtime imports) |
+| `src/logic-functions/on-job-completed.ts` | Job-completed invoice handoff: database-event logic function (`job.updated`, `status`) |
+| `src/logic-functions/job-completed.ts` | Invoice handoff decision logic, GraphQL documents, payload builders (no SDK runtime imports) |
+| `src/logic-functions/job-completed.test.ts` | Unit tests: literals pinned to manifests, transition rules, estimate prefill, retry-safe handler flow |
+| `src/logic-functions/workspace-api.ts` | Shared record-API (GraphQL) client for the handoffs |
 | `src/logic-functions/api-access.ts` | Shared env resolution for all logic functions (`TWENTY_API_URL`, app token first) |
 | `src/logic-functions/api-access.test.ts` | Unit tests: injected env names and token preference |
 | `src/logic-functions/estimate-accepted.test.ts` | Unit tests: literals pinned to manifests, transition rules, payloads, retry-safe handler flow |
@@ -63,6 +72,11 @@ Estimate status → Accepted  ──(estimate.updated / status)──▶  Lead s
 | `src/views/estimate-record-page-fields.view.ts`, `src/views/job-record-page-fields.view.ts` | FIELDS_WIDGET views backing the record pages |
 | `src/navigation-menu-items/estimates.navigation-menu-item.ts`, `jobs.…` | Sidebar "Estimates" / "Jobs" items |
 | `src/page-layouts/estimate.page-layout.ts`, `job.page-layout.ts` | Record-page layouts: Home (fields) + Timeline tabs |
+| `src/objects/invoice.object.ts` | **Invoice** custom object: status (Draft/Sent/Paid/Void), amount, lineItems (RAW_JSON), issueDate, dueDate, paidDate |
+| `src/fields/invoice/*.field.ts`, `src/fields/job/invoices.field.ts`, `src/fields/person/invoices.field.ts` | Invoice.job → Job, Invoice.customer → Person, and their ONE_TO_MANY reverse fields |
+| `src/views/all-invoices.view.ts`, `src/views/unpaid-invoices.view.ts` | Invoices table; Unpaid (Draft + Sent) sorted by due date |
+| `src/views/invoice-record-page-fields.view.ts`, `src/page-layouts/invoice.page-layout.ts` | Invoice record page: Home (fields) + Timeline tabs |
+| `src/navigation-menu-items/invoices.navigation-menu-item.ts` | Sidebar "Invoices" (7, after Jobs) |
 
 ## Fields added to Opportunity
 
@@ -84,7 +98,13 @@ Built exactly on the real-estate/partners app conventions:
 - **Job** — `status` SELECT (Scheduled → En Route → In Progress → Completed/Cancelled, default Scheduled), `serviceType` SELECT (generic trades), `scheduledStart`/`scheduledEnd` DATE_TIME, `techNotes` RICH_TEXT, `estimate` MANY_TO_ONE → Estimate, `customer` MANY_TO_ONE → Person, `assignedTech` MANY_TO_ONE → WorkspaceMember.
 - Reverse ONE_TO_MANY fields (`estimates` on Opportunity/Person, `jobs` on Estimate/Person/WorkspaceMember) complete each pairing.
 - Record pages: Home tab (FIELDS widget over a FIELDS_WIDGET view) + Timeline tab — tasks, notes, attachments surface through the timeline automatically.
-- Navigation: Leads (4) → Estimates (5) → Jobs (6).
+- Navigation: Leads (4) → Estimates (5) → Jobs (6) → Invoices (7).
+
+## Invoice custom object (billing)
+
+- **Invoice** — `status` SELECT (Draft → Sent → Paid, or Void; default Draft), `amount` CURRENCY, `lineItems` RAW_JSON (same shape as Estimate line items), `issueDate` / `dueDate` / `paidDate` DATE, `job` MANY_TO_ONE → Job (join `jobId`), `customer` MANY_TO_ONE → Person (join `customerId`), with reverse `invoices` on Job and Person.
+- "Overdue" is deliberately **not** a stored status — it is a Sent invoice past its due date, so it can never drift out of sync. The **Unpaid Invoices** view (Draft + Sent, soonest due first) puts overdue ones at the top.
+- Not in this version: online payment (Stripe etc.), invoice PDFs, emailing invoices, review requests after payment.
 
 ## Stages — why an app-owned `leadStage` field
 
@@ -103,6 +123,16 @@ The manifest **cannot rewrite the options of the core `stage` field** (`defineFi
 
 **Retries:** the server re-queues a failed run up to 3 times. The lead update runs first and is idempotent; the job is created last and only if none exists for the estimate, so a retry after a partial failure completes the work without duplicates. API errors are thrown, not swallowed, so failures show up in the function logs.
 
+## Automation — job completed → Draft Invoice
+
+`src/logic-functions/on-job-completed.ts` runs on every Job update that touches `status` (`job.updated`, `updatedFields: ['status']`). When the status moves **into** Completed (Cancelled never bills; re-saving a completed job does nothing):
+
+1. If the job already has an invoice, nothing is created (retries and re-completes are safe).
+2. Otherwise, when the job has an estimate, its `totalAmount` and `lineItems` are read.
+3. A **Draft** Invoice is created: `name` "Invoice for <work>" (a leading "Job for " is dropped, so handoff-created jobs don't produce "Invoice for Job for …"), linked to the job and customer, amount and line items copied from the estimate. Issue and due dates are left for the office to set when sending.
+
+Same mechanics as the estimate handoff (server-verified trigger matching, app token, function role now also writes Invoice, creation as the last step for retry safety). Additionally verified: findOne takes `filter` (`estimate(filter: { id: { eq } })`) and CURRENCY is the composite `{ amountMicros, currencyCode }`, copied through unchanged.
+
 ## Gates
 
 - **Gate A — relabel Opportunity → Lead (post-install, `shouldRunSynchronously: true`):** **verified against twenty-server source** (`object-metadata` module):
@@ -118,7 +148,9 @@ The manifest **cannot rewrite the options of the core `stage` field** (`defineFi
 
 ## Verification status
 
-**Local (2026-11-17, estimate-accepted handoff added; post-install env fix):** `yarn typecheck`, `yarn test` (44/44), `yarn twenty dev:build` (manifest lists the `estimate-accepted-handoff` function with its `estimate.updated` / `status` trigger, and the function role's Opportunity + Job write grants), and `yarn smoke` (4/4 post-install + 6/6 handoff checks on the built bundles, against a mock API) all pass. Not yet run against a live Twenty server.
+**Local (2026-11-17, billing added):** `yarn typecheck`, `yarn test` (65/65), `yarn twenty dev:build` (manifest: estimate/job/invoice objects, invoice relations, views, record page, nav item, both handoff functions with their triggers, function-role writes on Opportunity + Job + Invoice), and `yarn smoke` (4/4 post-install, 6/6 estimate handoff, 6/6 invoice handoff on the built bundles, against mock APIs) all pass. Not yet run against a live Twenty server.
+
+**Earlier (2026-11-17, estimate-accepted handoff; post-install env fix):** same commands, 44/44 tests.
 
 **Local (sandbox, 2026-09-12):** `yarn typecheck`, `yarn test` (20/20 — Gate A payload invariants + manifest-layer invariants), `yarn twenty dev:build`, and `yarn smoke` (4/4 on the built post-install bundle) all pass. Manifest build enforces the single-`defineApplicationRole` invariant, so the default function role is pinned at build time.
 
@@ -132,7 +164,7 @@ yarn install
 yarn typecheck               # tsc --noEmit
 yarn test                    # unit tests (vitest)
 yarn twenty dev:build        # build the manifest + function bundles locally
-yarn smoke                   # runtime smoke tests of the BUILT post-install hook and estimate-accepted handoff
+yarn smoke                   # runtime smoke tests of the BUILT post-install hook and both handoffs
 
 yarn twenty dev                 # sync manifest to a local workspace (hooks don't run in dev)
 yarn twenty dev:function:exec --postInstall   # run Gate A manually during development
@@ -146,5 +178,6 @@ Post-install runs on fresh installs only (`previousVersion === undefined`).
 - **SDK constants are stubbed inside built function bundles** (`stub-twenty-sdk-define.plugin.ts`): any non-`define*` import from `twenty-sdk/define` — including `STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS` — renders as an empty string at runtime. Runtime code (handlers) must use literal UIDs; `lead-labels.test.ts` pins the literal to the real SDK value to catch upstream drift. Manifest code (objects/fields/views) is unaffected.
 - Gate A is source-verified against this repo's server code; the residual risks are server-version drift (the editable-properties list or filter API changing upstream) and the app token being denied the metadata mutation. Both fail safe: the hook logs and the workspace keeps "Opportunity".
 - Standard-field references (`opportunity.fields.name`, `.owner`, `.pointOfContact`) are doc-verified and used in **manifest** code only; any drift fails at manifest build, not runtime.
+- Job-completed invoice handoff: same near-simultaneous caveat as below (Completed → other → Completed within one queue cycle could create two drafts); void the extra one.
 - Estimate-accepted handoff: two near-simultaneous status changes into Accepted for the same estimate could both pass the existing-job check before either job exists, creating two jobs. Unlikely in normal use (it needs Accepted → other → Accepted within one queue cycle); delete the extra job if it happens.
 - View filters are literal values, so "My Leads" is scoped by the Sales Rep role predicate rather than a current-user filter (admins see all).

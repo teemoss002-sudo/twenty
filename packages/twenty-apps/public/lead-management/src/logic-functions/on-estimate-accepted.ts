@@ -6,7 +6,7 @@ import { defineLogicFunction } from 'twenty-sdk/define';
 
 import { ESTIMATE_ACCEPTED_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
-import { type ApiAccess, resolveApiAccess } from './api-access';
+import { resolveApiAccess } from './api-access';
 import {
   buildCreateJobVariables,
   buildFindJobsForEstimateVariables,
@@ -19,6 +19,7 @@ import {
   MARK_LEAD_WON_MUTATION,
   planEstimateHandoff,
 } from './estimate-accepted';
+import { requestWorkspaceApi } from './workspace-api';
 
 /**
  * Estimate → Lead → Job handoff (see ./estimate-accepted.ts for the
@@ -27,41 +28,7 @@ import {
  * Order matters for retries: the lead update runs first and is idempotent;
  * the job is created last and only when the estimate has none yet. A retry
  * after a partial failure therefore finishes the work without duplicating it.
- * Errors are thrown (not swallowed) so the server records the failure and
- * re-queues the run.
  */
-
-const requestWorkspaceApi = async (
-  access: ApiAccess,
-  query: string,
-  variables: Record<string, unknown>,
-): Promise<Record<string, unknown>> => {
-  const response = await fetch(`${access.apiUrl}/graphql`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${access.accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  const body = (await response.json()) as {
-    data?: Record<string, unknown>;
-    errors?: Array<{ message?: string }>;
-  };
-
-  if (body.errors?.length) {
-    throw new Error(
-      body.errors.map((entry) => entry.message ?? 'unknown error').join('; '),
-    );
-  }
-
-  if (!response.ok) {
-    throw new Error(`workspace API responded ${response.status}`);
-  }
-
-  return body.data ?? {};
-};
 
 export const handler = async (event: EstimateUpdatedEvent): Promise<string> => {
   const plan = planEstimateHandoff(event);
